@@ -3,11 +3,10 @@
     "name": "Mock-Sdk-RN",
     "slug": "Mock-Sdk-RN",
     "scheme": "mock-sdk-rn",
-    "newArchEnabled": true,
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
       "supportsTablet": true
     },
@@ -25,7 +24,20 @@
     },
     "plugins": [
       "expo-arcgis",
-      "expo-router"
+      "expo-router",
+      "expo-font",
+      [
+        "expo-location",
+        {
+          "locationAlwaysAndWhenInUsePermission": "Allow Mock-Sdk-RN to use your location to explore nearby places."
+        }
+      ],
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Allow Mock-Sdk-RN to access your photos to set a profile picture."
+        }
+      ]
     ]
   }
 }
