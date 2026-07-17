@@ -1,13 +1,49 @@
-import { Stack } from 'expo-router';
+import { Stack } from "expo-router";
+import { StatusBar } from "expo-status-bar";
+import { useContext } from "react";
+import ThemeProvider, { ThemeContext } from "../context/ThemeContext";
+import { Colors } from "../constants/Colors";
+import { ProgressProvider } from "../context/ProgressContext";
+import { UserProvider } from "../context/UserContext";
 
-export default function Layout() {
+function MainLayout() {
+  const context = useContext(ThemeContext);
+  if (!context) {
+    return <Stack screenOptions={{ headerShown: false }} />;
+  }
+  const { theme } = context;
+  const colorTheme = Colors[theme] || Colors.light;
+
   return (
-    <Stack>
-      <Stack.Screen name="index" options={{ title: 'ArcGIS Tests' }} />
-      <Stack.Screen name="test-map" options={{ title: 'Test 1: Map' }} />
-      <Stack.Screen name="test-layers" options={{ title: 'Test 2: Layers' }} />
-      <Stack.Screen name="test-search" options={{ title: 'Test 3: Search' }} />
-      <Stack.Screen name="test-routing" options={{ title: 'Test 4: Routing' }} />
-    </Stack>
+    <>
+      <StatusBar style={theme === "dark" ? "light" : "dark"} />
+      <Stack
+        screenOptions={{
+          headerStyle: {
+            backgroundColor: colorTheme.navBackground,
+          },
+          headerTintColor: colorTheme.title,
+          headerTitleAlign: "center",
+          headerShown: true,
+        }}
+      >
+        <Stack.Screen name="index" options={{ headerShown: false }} />
+        <Stack.Screen name="(auth)" options={{ headerShown: false }} />
+        <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
+        <Stack.Screen name="(main)" options={{ headerShown: false }} />
+      </Stack>
+    </>
+  );
+}
+
+export default function RootLayout() {
+  return (
+    <ThemeProvider>
+      <ProgressProvider>
+        <UserProvider>
+          <MainLayout />
+        </UserProvider>
+      </ProgressProvider>
+    </ThemeProvider>
   );
 }
