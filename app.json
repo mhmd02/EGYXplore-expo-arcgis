@@ -2,6 +2,8 @@
   "expo": {
     "name": "Mock-Sdk-RN",
     "slug": "Mock-Sdk-RN",
+    "scheme": "mock-sdk-rn",
+    "newArchEnabled": true,
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
@@ -15,10 +17,15 @@
         "foregroundImage": "./assets/android-icon-foreground.png",
         "backgroundImage": "./assets/android-icon-background.png",
         "monochromeImage": "./assets/android-icon-monochrome.png"
-      }
+      },
+      "package": "com.anonymous.MockSdkRN"
     },
     "web": {
       "favicon": "./assets/favicon.png"
-    }
+    },
+    "plugins": [
+      "expo-arcgis",
+      "expo-router"
+    ]
   }
 }
