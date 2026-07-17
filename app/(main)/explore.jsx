@@ -11,7 +11,7 @@ import {
   AppState,
   Alert,
 } from "react-native";
-import { WebView } from "react-native-webview";
+import { MapSettings, Map, MapView, FeatureLayer } from "expo-arcgis";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
@@ -22,14 +22,48 @@ import { ThemeContext } from "../../context/ThemeContext";
 import { Colors } from "../../constants/Colors";
 import CustomPopup from "../../components/CustomPopup.jsx";
 
-import { API, metroLayer, metroLinesLayer } from "../../assets/js/config.js";
-import { getLeafletMapHtml, getEsriMaps } from "../../assets/html/basemap.js";
+import {
+  ARCGIS_API_KEY,
+  ARCGIS_LICENSE_KEY,
+  FEATURE_LAYERS,
+  MAP_CENTER,
+} from "../../config/arcgis.js";
+
+// Renderers ported from the old WebView getEsriMaps()
+const metroStationsRenderer = {
+  type: "simple",
+  symbol: {
+    type: "simple-marker",
+    size: 6,
+    color: "blue",
+    outline: { width: 0.5, color: "black" },
+  },
+};
+
+const metroLinesRenderer = {
+  type: "simple",
+  symbol: {
+    type: "simple-line",
+    width: 2,
+    color: "green",
+  },
+};
+
+// The native `identify` returns the layer's title (layerName), while CustomPopup
+// keys off the old WebView layer ids ("metropoints" / "metrolines"). Map between them.
+const layerNameToId = (layerName = "") => {
+  const name = layerName.toLowerCase();
+  if (name.includes("line")) return "metrolines";
+  if (name.includes("station")) return "metropoints";
+  return null;
+};
 
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [locationHistory, setLocationHistory] = useState([]);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef();
+  const mapViewRef = useRef(null);
 
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [clickLocation, setClickLocation] = useState(null);
@@ -39,7 +73,7 @@ export default function Explore() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
 
-  const mapHtml = getEsriMaps(theme, API, metroLayer, metroLinesLayer);
+  const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
 
   const checkLocationStatus = async () => {
     const { status } = await Location.getForegroundPermissionsAsync();
@@ -122,33 +156,45 @@ export default function Explore() {
   const handleSearch = () => {
     if (searchRef.current) searchRef.current.focus();
   };
-  const handleWebViewMessage = (event) => {
-    if (event.nativeEvent.data === "map-tapped") {
-      Keyboard.dismiss();
-      return;
-    }
+
+  // Native replacement for the WebView click/hitTest + postMessage flow.
+  const handleMapTap = async (event) => {
+    // Any tap dismisses the keyboard (was the "map-tapped" message).
+    Keyboard.dismiss();
 
     try {
-      const data = JSON.parse(event.nativeEvent.data);
+      if (!mapViewRef.current) return;
 
-      switch (data.type) {
-        case "FEATURE_SELECTED":
-          setSelectedFeature(data.payload.attributes);
-          setClickLocation(data.location);
-          setLayerInfo(data.payload.layerId);
-          break;
-        case "DESELECT_ALL":
-          setSelectedFeature(null);
-          setClickLocation(null);
-          break;
-        default:
-          break;
+      const { screenPoint, mapPoint } = event.nativeEvent;
+      const results = await mapViewRef.current.identify(screenPoint, {
+        tolerance: 12,
+        maxResults: 1,
+      });
+
+      // Find the first layer result that has a feature (FEATURE_SELECTED).
+      const hit = (results || []).find(
+        (r) => r.features && r.features.length > 0,
+      );
+
+      if (hit) {
+        const feature = hit.features[0];
+        setSelectedFeature(feature.attributes);
+        setClickLocation({
+          latitude: mapPoint.latitude,
+          longitude: mapPoint.longitude,
+        });
+        setLayerInfo(layerNameToId(hit.layerName));
+      } else {
+        // Tapped empty space -> clear selection (DESELECT_ALL).
+        setSelectedFeature(null);
+        setClickLocation(null);
+        setLayerInfo(null);
       }
     } catch (e) {
-      console.warn("Error parsing WebView message:", e);
-      Alert.alert("Somehting went wrong", "Please contact you api provider.");
+      console.warn("Identify error:", e);
     }
   };
+
   return (
     <>
       <ThemedView safe={true} style={styles.explore}>
@@ -169,14 +215,32 @@ export default function Explore() {
 
         {/* The map fills the container entirely underneath */}
         <View style={styles.mapContainer}>
-          <WebView
-            originWhitelist={["*"]}
-            source={{ html: mapHtml }}
-            style={styles.map}
-            javaScriptEnabled={true}
-            domStorageEnabled={true}
-            onMessage={handleWebViewMessage}
-          />
+          <MapSettings
+            config={{ apiKey: ARCGIS_API_KEY, license: ARCGIS_LICENSE_KEY }}
+          >
+            <Map
+              basemap={basemap}
+              initialViewpoint={{
+                latitude: MAP_CENTER.latitude,
+                longitude: MAP_CENTER.longitude,
+                scale: 250000,
+              }}
+            >
+              <FeatureLayer
+                url={FEATURE_LAYERS.metroLines}
+                renderer={metroLinesRenderer}
+              />
+              <FeatureLayer
+                url={FEATURE_LAYERS.metroStations}
+                renderer={metroStationsRenderer}
+              />
+              <MapView
+                ref={mapViewRef}
+                style={styles.map}
+                onTap={handleMapTap}
+              />
+            </Map>
+          </MapSettings>
           {selectedFeature && clickLocation && (
             <CustomPopup
               data={selectedFeature}
@@ -256,22 +320,21 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    zIndex: 15,
+    zIndex: 10,
+  },
+  inputWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    position: "relative",
   },
   inputStyle: {
+    flex: 1,
     borderRadius: 50,
-    overflow: "hidden",
-    paddingRight: 80,
-  },
-  /* Added wrappers to float elements without modifying your style object dimensions */
-  inputWrapper: {
-    position: "relative",
-    justifyContent: "center",
-    width: "100%",
+    paddingRight: 70,
   },
   iconContainer: {
     position: "absolute",
-    right: 16, // Kept deep inside your 25px border radius boundary
+    right: 12,
     flexDirection: "row",
     alignItems: "center",
   },
