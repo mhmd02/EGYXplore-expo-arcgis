@@ -10,8 +10,17 @@ import {
   Platform,
   AppState,
   Alert,
+  ActivityIndicator,
 } from "react-native";
-import { MapSettings, Map, MapView, FeatureLayer } from "expo-arcgis";
+import {
+  MapSettings,
+  Map,
+  MapView,
+  FeatureLayer,
+  GraphicsOverlay,
+  Graphic,
+  geocoder,
+} from "expo-arcgis";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import * as Location from "expo-location";
@@ -49,6 +58,17 @@ const metroLinesRenderer = {
   },
 };
 
+// Marker dropped on the map for a geocoded search result (a one-off graphic,
+// not part of a data layer). A red diamond keeps it distinct from the blue
+// station markers and green metro lines.
+const searchMarkerSymbol = {
+  type: "simple-marker",
+  style: "diamond",
+  size: 14,
+  color: "red",
+  outline: { width: 1, color: "white" },
+};
+
 // The native `identify` returns the layer's title (layerName), while CustomPopup
 // keys off the old WebView layer ids ("metropoints" / "metrolines"). Map between them.
 const layerNameToId = (layerName = "") => {
@@ -62,12 +82,17 @@ export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isSearching, setIsSearching] = useState(false);
+  const [searchPoint, setSearchPoint] = useState(null);
   const searchRef = useRef();
   const mapViewRef = useRef(null);
 
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [clickLocation, setClickLocation] = useState(null);
   const [layerInfo, setLayerInfo] = useState(null);
+
+  //To move the map dynamically on search
+  const [mapViewpoint, setMapViewpoint] = useState(null);
 
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
@@ -111,7 +136,7 @@ export default function Explore() {
             setCurrentLocation(newLocation);
           },
         );
-        
+
         // If the component unmounted while we were waiting for the promise,
         // kill the subscription immediately to prevent a background leak.
         if (isCancelled) {
@@ -158,8 +183,49 @@ export default function Explore() {
     }
   };
 
-  const handleSearch = () => {
-    if (searchRef.current) searchRef.current.focus();
+  const handleSearch = async () => {
+    Keyboard.dismiss(); // Hides the keyboard
+    if (!searchQuery.trim()) return;
+    if (isSearching) return; // Guard against double-submits while a search is in flight
+    setIsSearching(true);
+    try {
+      // This sends "Cairo", for example, to the ArcGIS servers
+      const results = await geocoder.geocode(searchQuery);
+      if (!results || results.length === 0) {
+        Alert.alert(
+          "No Results",
+          "Could not find any place matching your search.",
+        );
+        return;
+      }
+      const bestMatch = results[0];
+
+      const pt = bestMatch.location;
+      if (pt) {
+        // Extract the exact coordinates
+        const lat = pt.y || pt.latitude;
+        const lon = pt.x || pt.longitude;
+        if (lat && lon) {
+          // 1. Move the map camera (from Step 2)
+          setMapViewpoint({
+            latitude: lat,
+            longitude: lon,
+            scale: 50000, // Zoom level (smaller number = closer)
+          });
+          // 2. Drop a marker on the map at the searched place
+          setSearchPoint({ latitude: lat, longitude: lon });
+        }
+        // 3. Open the popup at that location
+        setClickLocation({ latitude: lat, longitude: lon });
+        setSelectedFeature({ Name: bestMatch.label }); // Shows the place name in the popup
+        setLayerInfo(null); // It's a general place, not a metro station
+      }
+    } catch (err) {
+      console.warn("Geocoding Error:", err);
+      Alert.alert("Error", "Something went wrong while searching");
+    } finally {
+      setIsSearching(false);
+    }
   };
 
   // Native replacement for the WebView click/hitTest + postMessage flow.
@@ -194,6 +260,7 @@ export default function Explore() {
         setSelectedFeature(null);
         setClickLocation(null);
         setLayerInfo(null);
+        setSearchPoint(null);
       }
     } catch (e) {
       console.warn("Identify error:", e);
@@ -242,8 +309,22 @@ export default function Explore() {
               <MapView
                 ref={mapViewRef}
                 style={styles.map}
+                viewpoint={mapViewpoint}
                 onTap={handleMapTap}
-              />
+              >
+                {searchPoint && (
+                  <GraphicsOverlay>
+                    <Graphic
+                      geometry={{
+                        type: "point",
+                        x: searchPoint.longitude,
+                        y: searchPoint.latitude,
+                      }}
+                      symbol={searchMarkerSymbol}
+                    />
+                  </GraphicsOverlay>
+                )}
+              </MapView>
             </Map>
           </MapSettings>
           {selectedFeature && clickLocation && (
@@ -254,6 +335,7 @@ export default function Explore() {
               onClose={() => {
                 setSelectedFeature(null);
                 setClickLocation(null);
+                setSearchPoint(null);
               }}
               colorTheme={colorTheme}
             />
@@ -278,6 +360,8 @@ export default function Explore() {
                 placeholder="Search"
                 value={searchQuery}
                 onChangeText={setSearchQuery}
+                returnKeyType="search"
+                onSubmitEditing={handleSearch}
                 style={[
                   styles.inputStyle,
                   { borderColor: colorTheme.border, borderWidth: 2 },
@@ -286,20 +370,31 @@ export default function Explore() {
                 placeholderTextColor={colorTheme.placeholder}
               />
               <View style={styles.iconContainer}>
-                {searchQuery.length > 0 && (
+                {searchQuery.length > 0 && !isSearching && (
                   <TouchableOpacity
-                    onPress={() => setSearchQuery("")}
+                    onPress={() => {
+                      setSearchQuery("");
+                      setSearchPoint(null);
+                      setSelectedFeature(null);
+                      setClickLocation(null);
+                    }}
                     style={styles.iconButton}
                   >
                     <Ionicons name="close-circle" size={20} color="#94A3B8" />
                   </TouchableOpacity>
                 )}
-                <TouchableOpacity
-                  style={styles.iconButton}
-                  onPress={handleSearch}
-                >
-                  <Ionicons name="search" size={20} color="#64748B" />
-                </TouchableOpacity>
+                {isSearching ? (
+                  <View style={styles.iconButton}>
+                    <ActivityIndicator size="small" color={Colors.primary} />
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.iconButton}
+                    onPress={handleSearch}
+                  >
+                    <Ionicons name="search" size={20} color="#64748B" />
+                  </TouchableOpacity>
+                )}
               </View>
             </View>
           </View>
