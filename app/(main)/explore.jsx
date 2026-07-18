@@ -307,7 +307,6 @@ export default function Explore() {
 const styles = StyleSheet.create({
   explore: {
     flex: 1,
-    backgroundColor: "#FFFFFF",
   },
   mapContainer: {
     flex: 1,
