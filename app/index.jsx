@@ -1,56 +1,81 @@
-import { View, Text, StyleSheet, TouchableOpacity } from "react-native";
-import { useRouter } from "expo-router";
+import {
+  Keyboard,
+  StyleSheet,
+  Text,
+  TouchableWithoutFeedback,
+  View,
+} from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Link, useRouter } from "expo-router";
 
-export default function Index() {
+import ThemedTextInput from "../components/ThemedTextInput";
+import ThemedView from "../components/ThemedView";
+import ThemedButton from "../components/ThemedButton";
+import ThemedLogo from "../components/Logo";
+import ThemedText from "../components/ThemedText";
+import Spacer from "../components/Spacer";
+import { Colors } from "../constants/Colors";
+
+export default function App() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
-
-  const tests = [
-    { name: "Test 1: Basic Maps", route: "/test-map" },
-    { name: "Test 2: Feature Layers", route: "/test-layers" },
-    { name: "Test 3: Search / Geocoding", route: "/test-search" },
-    { name: "Test 4: Routing", route: "/test-routing" },
-  ];
-
   return (
-    <View style={styles.container}>
-      <Text style={styles.title}>ArcGIS Expo Tests</Text>
-      {tests.map((test, index) => (
-        <TouchableOpacity
-          key={index}
-          style={styles.button}
-          onPress={() => router.push(test.route)}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+      <ThemedView style={[styles.container]}>
+        <ThemedText style={styles.logoText}>EGYXPLORE</ThemedText>
+        <Spacer />
+        <ThemedButton
+          style={styles.link}
+          onPress={() => router.push("/login")}
         >
-          <Text style={styles.buttonText}>{test.name}</Text>
-        </TouchableOpacity>
-      ))}
-    </View>
+          <Text style={{ textAlign: "center" }}>EXPLORE</Text>
+        </ThemedButton>
+      </ThemedView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    padding: 20,
-    backgroundColor: "#fff",
     alignItems: "center",
     justifyContent: "center",
   },
-  title: {
-    fontSize: 24,
-    fontWeight: "bold",
-    marginBottom: 30,
-  },
-  button: {
-    backgroundColor: "#007AFF",
-    padding: 15,
-    borderRadius: 8,
+  searchContainer: {
+    position: "absolute", // Makes it float OVER the map
     width: "100%",
     alignItems: "center",
-    marginBottom: 15,
+    zIndex: 1,
   },
-  buttonText: {
-    color: "#fff",
-    fontSize: 16,
-    fontWeight: "600",
+  searchInput: {
+    width: "80%",
+    borderRadius: 12,
+    padding: 10,
+    // Adds a nice shadow so it stands out from the map
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  button: {
+    position: "absolute",
+    width: "50%",
+    right: 0,
+  },
+  link: {
+    backgroundColor: "#ffdc4f",
+    padding: 12,
+    marginVertical: 10,
+    borderRadius: 15,
+    width: "35%",
+    textAlign: "center",
+  },
+  logoText: {
+    fontSize: 36,
+    fontWeight: "900", // Extra bold font weight
+    color: "#C19A6B", // Heritage Gold color
+    letterSpacing: 4, // Spreads out letters for a modern luxury brand look
+    textTransform: "uppercase", // Forces logo text to uppercase
   },
 });
