@@ -60,7 +60,7 @@ const layerNameToId = (layerName = "") => {
 
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
-  const [locationHistory, setLocationHistory] = useState([]);
+  const [currentLocation, setCurrentLocation] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const searchRef = useRef();
   const mapViewRef = useRef(null);
@@ -85,41 +85,46 @@ export default function Explore() {
   useEffect(() => {
     checkLocationStatus();
 
-    const intervalId = setInterval(() => {
-      checkLocationStatus();
-    }, 2000);
-
     const subscription = AppState.addEventListener("change", (nextAppState) => {
       if (nextAppState === "active") {
         checkLocationStatus();
       }
     });
     return () => {
-      clearInterval(intervalId);
       subscription.remove();
     };
   }, []);
 
   useEffect(() => {
     let subscriber = null;
+    let isCancelled = false;
 
     const startTracking = async () => {
       if (hasLocationPermission) {
-        subscriber = await Location.watchPositionAsync(
+        const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Highest,
             timeInterval: 10000,
             distanceInterval: 3,
           },
           (newLocation) => {
-            setLocationHistory((prevHistory) => [...prevHistory, newLocation]);
+            setCurrentLocation(newLocation);
           },
         );
+        
+        // If the component unmounted while we were waiting for the promise,
+        // kill the subscription immediately to prevent a background leak.
+        if (isCancelled) {
+          sub.remove();
+        } else {
+          subscriber = sub;
+        }
       }
     };
     startTracking();
 
     return () => {
+      isCancelled = true;
       if (subscriber) {
         subscriber.remove();
       }

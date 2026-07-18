@@ -9,9 +9,9 @@ export default function CustomPopup({
   onClose,
   colorTheme,
 }) {
-  if (!data) return null;
-
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
+
+  if (!data) return null;
 
   const Id = layerInfo;
 

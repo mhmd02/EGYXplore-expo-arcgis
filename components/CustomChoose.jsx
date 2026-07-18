@@ -16,8 +16,7 @@ export default function CustomChoose({
   onChooseGallery,
   colorTheme,
 }) {
-  const isDark =
-    colorTheme.background === "#000" || colorTheme.background === "#121212"; // Adjust based on your actual theme constants
+  const isDark = colorTheme.background === "#101521";
   const menuBgColor = isDark ? "#1E1F22" : "#FFFFFF";
   const textColor = isDark ? "#E3E3E3" : "#1F1F1F";
   const iconColor = isDark ? "#C4C7C5" : "#444746";
