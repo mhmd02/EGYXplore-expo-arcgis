@@ -310,7 +310,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#FFFFFF",
   },
   mapContainer: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     overflow: "hidden",
   },
   map: {

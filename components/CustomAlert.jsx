@@ -52,7 +52,7 @@ export default function CustomAlert({
 
 const styles = StyleSheet.create({
   backdrop: {
-    ...StyleSheet.absoluteFillObject,
+    flex: 1,
     backgroundColor: "rgba(0,0,0,0.5)", // Darkens the screen behind the alert
     justifyContent: "center",
     alignItems: "center",
