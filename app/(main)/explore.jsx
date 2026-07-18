@@ -228,6 +228,27 @@ export default function Explore() {
     }
   };
 
+  const handleGoToMyLocation = () => {
+    // Check if we have successfully fetched the coordinates
+    if (currentLocation && currentLocation.coords) {
+      const jitter = Math.random() * 0.0000001;
+      setMapViewpoint({
+        latitude: currentLocation.coords.latitude + jitter,
+        longitude: currentLocation.coords.longitude + jitter,
+        scale: 15000, // Zoom in fairly close to the user
+      });
+    } else if (!hasLocationPermission) {
+      Alert.alert(
+        "Permission Needed",
+        "Please enable location access to use this feature.",
+      );
+    } else {
+      Alert.alert(
+        "Locating...",
+        "Still waiting for a GPS signal. Please try again in a moment.",
+      );
+    }
+  };
   // Native replacement for the WebView click/hitTest + postMessage flow.
   const handleMapTap = async (event) => {
     // Any tap dismisses the keyboard (was the "map-tapped" message).
@@ -311,6 +332,11 @@ export default function Explore() {
                 style={styles.map}
                 viewpoint={mapViewpoint}
                 onTap={handleMapTap}
+                locationDisplay={
+                  hasLocationPermission
+                    ? { showLocation: true, autoPanMode: "off" }
+                    : undefined
+                }
               >
                 {searchPoint && (
                   <GraphicsOverlay>
@@ -399,6 +425,19 @@ export default function Explore() {
             </View>
           </View>
         </TouchableWithoutFeedback>
+        {/* My Location Button - Floating at the bottom right */}
+        <TouchableOpacity
+          style={[
+            styles.myLocationButton,
+            {
+              bottom: insets.bottom + 80,
+              backgroundColor: colorTheme.uiBackground,
+            },
+          ]}
+          onPress={handleGoToMyLocation}
+        >
+          <Ionicons name="locate" size={24} color={colorTheme.title} />
+        </TouchableOpacity>
       </ThemedView>
     </>
   );
@@ -471,5 +510,21 @@ const styles = StyleSheet.create({
     paddingVertical: 6,
     paddingHorizontal: 12,
     borderRadius: 20,
+  },
+  myLocationButton: {
+    position: "absolute",
+    right: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 15,
+    // Smooth shadow for the floating effect
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
   },
 });
