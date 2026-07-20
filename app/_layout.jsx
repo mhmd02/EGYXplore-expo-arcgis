@@ -5,6 +5,7 @@ import ThemeProvider, { ThemeContext } from "../context/ThemeContext";
 import { Colors } from "../constants/Colors";
 import { ProgressProvider } from "../context/ProgressContext";
 import { UserProvider } from "../context/UserContext";
+import SettingsProvider from "../context/SettingsContext";
 
 function MainLayout() {
   const context = useContext(ThemeContext);
@@ -41,7 +42,9 @@ export default function RootLayout() {
     <ThemeProvider>
       <ProgressProvider>
         <UserProvider>
-          <MainLayout />
+          <SettingsProvider>
+            <MainLayout />
+          </SettingsProvider>
         </UserProvider>
       </ProgressProvider>
     </ThemeProvider>

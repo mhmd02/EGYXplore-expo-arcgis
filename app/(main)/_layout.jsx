@@ -1,14 +1,17 @@
+import { View, StyleSheet } from "react-native";
 import { Stack, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useContext } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
+import { SettingsContext } from "../../context/SettingsContext";
 
 export default function MainLayout() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
+  const { missionAlerts, rewardAlerts } = useContext(SettingsContext);
+
   const insets = useSafeAreaInsets();
 
   // Dynamic clean height calculation
@@ -79,11 +82,14 @@ export default function MainLayout() {
         options={{
           title: "Missions",
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons
-              name={focused ? "medal" : "medal-outline"}
-              size={24}
-              color={color}
-            />
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? "medal" : "medal-outline"}
+                size={24}
+                color={color}
+              />
+              {missionAlerts && <View style={styles.badgeDot} />}
+            </View>
           ),
         }}
       />
@@ -92,11 +98,14 @@ export default function MainLayout() {
         options={{
           title: "Rewards",
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons
-              name={focused ? "gift" : "gift-outline"}
-              size={24}
-              color={color}
-            />
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? "gift" : "gift-outline"}
+                size={24}
+                color={color}
+              />
+              {rewardAlerts && <View style={styles.badgeDot} />}
+            </View>
           ),
         }}
       />
@@ -116,3 +125,19 @@ export default function MainLayout() {
     </Tabs>
   );
 }
+const styles = StyleSheet.create({
+  iconContainer: {
+    position: "relative",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeDot: {
+    position: "absolute",
+    top: -2,
+    right: -6,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: "#0284C7",
+  },
+});

@@ -8,6 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { ThemeContext } from "../../../context/ThemeContext";
+import { SettingsContext } from "../../../context/SettingsContext";
 import { Colors } from "../../../constants/Colors";
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
@@ -20,12 +21,11 @@ export default function Settings() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
-
+  const { rewardAlerts, missionAlerts, setMissionAlerts, setRewardAlerts } =
+    useContext(SettingsContext);
   // Local settings state (in-memory for now — no persistence yet)
   const [language, setLanguage] = useState("English");
   const [currency, setCurrency] = useState("EGP");
-  const [missionAlerts, setMissionAlerts] = useState(true);
-  const [rewardAlerts, setRewardAlerts] = useState(true);
   const [emergencyName, setEmergencyName] = useState("");
   const [emergencyPhone, setEmergencyPhone] = useState("");
 
