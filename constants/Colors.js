@@ -14,8 +14,8 @@ export const Colors = {
     title: "#0F172A", // Deep slate/navy for strong, readable headings
     text: "#334155", // Softer dark gray for highly readable body text
     placeholder: "#919ca9",
-    iconColor: "#94A3B8", // Subtle gray for unselected navigation icons
-    iconColorFocused: "#0284C7", // Pops with your primary brand color when active
+    iconColor: "#050505", // Subtle gray for unselected navigation icons
+    iconColorFocused: "#000000", // Pops with your primary brand color when active
 
     border: "#E2E8F0", // Very soft border line to separate list items
   },
@@ -29,8 +29,8 @@ export const Colors = {
     title: "#F8FAFC", // Crisp white for headings
     text: "#CBD5E1", // Soft light gray for comfortable night reading (prevents eye strain)
     placeholder: "#919ca9",
-    iconColor: "#64748B", // Dimmed gray for unselected dark mode icons
-    iconColorFocused: "#38BDF8", // A lighter, glowing "Sky Blue" that stands out better on dark backgrounds
+    iconColor: "#e1e4e8", // Dimmed gray for unselected dark mode icons
+    iconColorFocused: "#feffff", // A lighter, glowing "Sky Blue" that stands out better on dark backgrounds
 
     border: "#334155", // Subtle dark divider line
   },

@@ -27,10 +27,9 @@ import * as Location from "expo-location";
 
 import ThemedView from "../../components/ThemedView";
 import ThemedTextInput from "../../components/ThemedTextInput";
+import CustomPopup from "../../components/CustomPopup.jsx";
 import { ThemeContext } from "../../context/ThemeContext";
 import { Colors } from "../../constants/Colors";
-import CustomPopup from "../../components/CustomPopup.jsx";
-
 import {
   ARCGIS_API_KEY,
   ARCGIS_LICENSE_KEY,
@@ -63,7 +62,7 @@ const metroLinesRenderer = {
 // station markers and green metro lines.
 const searchMarkerSymbol = {
   type: "simple-marker",
-  style: "diamond",
+  style: "circle",
   size: 14,
   color: "red",
   outline: { width: 1, color: "white" },
@@ -78,6 +77,19 @@ const layerNameToId = (layerName = "") => {
   return null;
 };
 
+const highlightPointSymbol = {
+  type: "simple-marker",
+  style: "circle",
+  size: 20,
+  color: "#00a6ff59",
+};
+
+const highlightLineSymbol = {
+  type: "simple-line",
+  width: 5,
+  color: "#00f2ff59",
+};
+
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -86,11 +98,10 @@ export default function Explore() {
   const [searchPoint, setSearchPoint] = useState(null);
   const searchRef = useRef();
   const mapViewRef = useRef(null);
-
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [clickLocation, setClickLocation] = useState(null);
   const [layerInfo, setLayerInfo] = useState(null);
-
+  const [highlightGraphic, setHighlightGraphic] = useState(null);
   //To move the map dynamically on search
   const [mapViewpoint, setMapViewpoint] = useState(null);
 
@@ -275,25 +286,47 @@ export default function Explore() {
           latitude: mapPoint.latitude,
           longitude: mapPoint.longitude,
         });
+        setMapViewpoint({
+          // Offset south so the tapped feature isn't hidden behind the popup,
+          // which docks near the bottom of the screen.
+          latitude: mapPoint.latitude - 0.005,
+          longitude: mapPoint.longitude,
+          scale: 15000,
+        });
         setLayerInfo(layerNameToId(hit.layerName));
+        if (feature.geometry) {
+          const geomType = feature.geometry.type;
+          const normalizedGeometry = feature.geometry;
+
+          setHighlightGraphic({
+            geometry: normalizedGeometry,
+            symbol:
+              geomType === "point" ? highlightPointSymbol : highlightLineSymbol,
+          });
+        }
       } else {
         // Tapped empty space -> clear selection (DESELECT_ALL).
         setSelectedFeature(null);
         setClickLocation(null);
         setLayerInfo(null);
         setSearchPoint(null);
+        setHighlightGraphic(null);
       }
     } catch (e) {
       console.warn("Identify error:", e);
     }
   };
-
   return (
     <>
       <ThemedView safe={true} style={styles.explore}>
         {/* Permission Request Bar - Floating at the absolute top */}
         {hasLocationPermission === false && (
-          <View style={[styles.requestBar, { top: insets.top }]}>
+          <View
+            style={[
+              styles.requestBar,
+              { top: insets.top, backgroundColor: "red" },
+            ]}
+          >
             <Text style={styles.requestText}>
               Location access needed to explore.
             </Text>
@@ -313,6 +346,7 @@ export default function Explore() {
           >
             <Map
               basemap={basemap}
+              style={{ flex: 1 }}
               initialViewpoint={{
                 latitude: MAP_CENTER.latitude,
                 longitude: MAP_CENTER.longitude,
@@ -350,6 +384,14 @@ export default function Explore() {
                     />
                   </GraphicsOverlay>
                 )}
+                {highlightGraphic && (
+                  <GraphicsOverlay>
+                    <Graphic
+                      geometry={highlightGraphic.geometry}
+                      symbol={highlightGraphic.symbol}
+                    />
+                  </GraphicsOverlay>
+                )}
               </MapView>
             </Map>
           </MapSettings>
@@ -362,6 +404,7 @@ export default function Explore() {
                 setSelectedFeature(null);
                 setClickLocation(null);
                 setSearchPoint(null);
+                setHighlightGraphic(null);
               }}
               colorTheme={colorTheme}
             />
