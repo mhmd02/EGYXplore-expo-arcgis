@@ -21,6 +21,8 @@ import ThemedView from "../../../components/ThemedView";
 import { Colors } from "../../../constants/Colors";
 import { takePhoto, pickImageFromGallery } from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
+import ThemedTextInput from "../../../components/ThemedTextInput";
+import ThemedView from "../../../components/ThemedView";
 import CustomChoose from "../../../components/CustomChoose";
 import { sendChatMessage } from "../../../constants/api";
 
