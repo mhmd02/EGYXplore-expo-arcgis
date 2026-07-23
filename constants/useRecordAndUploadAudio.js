@@ -21,8 +21,8 @@ export const useRecordAndUploadAudio = (onRecordingComplete) => {
           onRecordingComplete(uri);
         }
       } else {
-        await audioRecorder.prepareToRecordAsync();
         const permission = await AudioModule.requestRecordingPermissionsAsync();
+        await audioRecorder.prepareToRecordAsync();
         if (!permission.granted) {
           Alert.alert(
             "Permission Required",
