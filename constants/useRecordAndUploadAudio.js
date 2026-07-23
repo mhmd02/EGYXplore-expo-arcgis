@@ -16,7 +16,6 @@ export const useRecordAndUploadAudio = (onRecordingComplete) => {
         await audioRecorder.stop();
         setIsRecording(false);
         const uri = audioRecorder.uri;
-        console.log("Recording file URI:", uri);
         if (onRecordingComplete && uri) {
           onRecordingComplete(uri);
         }

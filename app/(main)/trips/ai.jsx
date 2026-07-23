@@ -17,15 +17,15 @@ import { useContext, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemeContext } from "../../../context/ThemeContext";
-import ThemedText from "../../../components/ThemedText";
 import { Colors } from "../../../constants/Colors";
 import { takePhoto, pickImageFromGallery } from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
+import { sendChatMessage } from "../../../constants/api";
+import ThemedText from "../../../components/ThemedText";
 import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedView from "../../../components/ThemedView";
 import CustomChoose from "../../../components/CustomChoose";
-import { sendChatMessage } from "../../../constants/api";
-
+import VoiceNotePlayer from "../../../components/Playback";
 export default function Chat() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
@@ -165,19 +165,7 @@ export default function Chat() {
           {/* Render Audio Indicator */}
           {item.audio && (
             <View style={styles.bubbleAudioRow}>
-              <Ionicons
-                name="mic"
-                size={16}
-                color={isUser ? "#fff" : colorTheme.text}
-              />
-              <ThemedText
-                style={{
-                  color: isUser ? "#fff" : colorTheme.text,
-                  fontSize: 13,
-                }}
-              >
-                Voice note attached
-              </ThemedText>
+              <VoiceNotePlayer uri={item.audio} colorTheme={colorTheme} />
             </View>
           )}
           {/* Text Content */}
