@@ -37,6 +37,12 @@
         {
           "photosPermission": "Allow Mock-Sdk-RN to access your photos to set a profile picture."
         }
+      ],
+      [
+        "expo-audio",
+        {
+          "microphonePermission": "Allow Mock-Sdk-RN to access your microphone."
+        }
       ]
     ]
   }

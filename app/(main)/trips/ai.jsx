@@ -11,11 +11,11 @@ import { Ionicons } from "@expo/vector-icons";
 import { useContext, useState } from "react";
 
 import { ThemeContext } from "../../../context/ThemeContext";
-import ThemedTextInput from "../../../components/ThemedTextInput";
-import ThemedView from "../../../components/ThemedView";
 import { Colors } from "../../../constants/Colors";
 import { takePhoto, pickImageFromGallery } from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
+import ThemedTextInput from "../../../components/ThemedTextInput";
+import ThemedView from "../../../components/ThemedView";
 import CustomChoose from "../../../components/CustomChoose";
 
 export default function Chat() {
