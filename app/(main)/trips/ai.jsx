@@ -9,15 +9,15 @@ import {
   ActivityIndicator,
   KeyboardAvoidingView,
   Platform,
+  Image,
+  ScrollView,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useContext, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemeContext } from "../../../context/ThemeContext";
-import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedText from "../../../components/ThemedText";
-import ThemedView from "../../../components/ThemedView";
 import { Colors } from "../../../constants/Colors";
 import { takePhoto, pickImageFromGallery } from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
@@ -31,9 +31,10 @@ export default function Chat() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const tabBarPadding = 60 + (insets.bottom > 0 ? insets.bottom : 16);
-  const [profileImage, setProfileImage] = useState(null);
   const [alertVisible, setAlertVisible] = useState(false);
+  const [images, setImages] = useState([]);
   const [text, setText] = useState("");
+  const [audioUri, setAudioUri] = useState(null);
 
   // The full conversation. Each item is { role: "user" | "assistant", content }.
   const [messages, setMessages] = useState([]);
@@ -46,43 +47,25 @@ export default function Chat() {
 
   const handleTakePhoto = async () => {
     const uri = await takePhoto();
-    if (uri) setProfileImage(uri);
+    if (uri) setImages((prevImages) => [...prevImages, uri]);
     setAlertVisible(false);
   };
 
   const handleChooseGallery = async () => {
-    const uri = await pickImageFromGallery();
-    if (uri) setProfileImage(uri);
+    const results = await pickImageFromGallery();
+    if (results) {
+      if (Array.isArray(results)) {
+        setImages((prevImages) => [...prevImages, ...results]);
+      } else {
+        setImages((prevImages) => [...prevImages, results]);
+      }
+    }
     setAlertVisible(false);
   };
 
   async function handleRecordingComplete(uri) {
-    try {
-      const filename = uri.split("/").pop();
-      const match = /\.(\w+)$/.exec(filename);
-      const ext = match ? match[1] : "m4a";
-      const mimeType = ext === "m4a" ? "audio/x-m4a" : `audio/${ext}`;
-
-      const formData = new FormData();
-      formData.append("audio", {
-        uri: uri,
-        name: filename,
-        type: mimeType,
-      });
-
-      console.log("Sending file to AI Agent...", filename); // --- SEND TO AI API ---
-      // const response = await fetch("https://your-api.com/analyze", {
-      //   method: "POST",
-      //   body: formData,
-      // });
-      // const result = await response.json();
-      // console.log("AI Response:", result);
-    } catch (uploadError) {
-      console.error("Upload failed:", uploadError);
-      Alert.alert(
-        "Upload Failed",
-        "Could not send the voice message to the server.",
-      );
+    if (uri) {
+      setAudioUri(uri);
     }
   }
 
@@ -94,17 +77,34 @@ export default function Chat() {
   // with the PRIOR history (excluding the new message), then append the reply.
   async function onSend() {
     const trimmed = (text ?? "").trim();
-    if (!trimmed || sending) return;
+    if ((!trimmed && images.length === 0 && !audioUri) || sending) return;
 
     Keyboard.dismiss();
     const history = messages.slice(-16); // prior turns, before this message
-    const next = [...messages, { role: "user", content: trimmed }];
+    const currentImages = [...images];
+    const currentAudio = audioUri;
+
+    const userMsg = {
+      role: "user",
+      content: trimmed,
+      images: currentImages,
+      audio: currentAudio,
+    };
+
+    const next = [...messages, userMsg];
     setMessages(next);
     setText("");
+    setImages([]);
+    setAudioUri(null);
     setSending(true);
 
     try {
-      const data = await sendChatMessage(trimmed, history);
+      const data = await sendChatMessage(
+        trimmed,
+        history,
+        currentImages,
+        currentAudio,
+      );
       setMessages([...next, { role: "assistant", content: data.reply }]);
       if (data.tripSaved) {
         // A trip was created/updated — data.tripPlanId / data.tripPlanTitle
@@ -146,9 +146,43 @@ export default function Chat() {
             },
           ]}
         >
-          <ThemedText style={{ color: isUser ? "#fff" : colorTheme.text }}>
-            {item.content}
-          </ThemedText>
+          {/* Render Attached Images */}
+          {item.images && item.images.length > 0 && (
+            <View style={styles.bubbleImagesGrid}>
+              {item.images.map((imgUri, idx) => (
+                <Image
+                  key={idx}
+                  source={{ uri: imgUri }}
+                  style={styles.bubbleImage}
+                />
+              ))}
+            </View>
+          )}
+
+          {/* Render Audio Indicator */}
+          {item.audio && (
+            <View style={styles.bubbleAudioRow}>
+              <Ionicons
+                name="mic"
+                size={16}
+                color={isUser ? "#fff" : colorTheme.text}
+              />
+              <ThemedText
+                style={{
+                  color: isUser ? "#fff" : colorTheme.text,
+                  fontSize: 13,
+                }}
+              >
+                Voice note attached
+              </ThemedText>
+            </View>
+          )}
+          {/* Text Content */}
+          {item.content ? (
+            <ThemedText style={{ color: isUser ? "#fff" : colorTheme.text }}>
+              {item.content}
+            </ThemedText>
+          ) : null}
         </View>
       </View>
     );
@@ -195,9 +229,53 @@ export default function Chat() {
           </View>
         )}
 
-        <View style={styles.inputContainer}>
+        {/* Modern AI Chat Input Bar */}
+        <View
+          style={[
+            styles.inputBoxContainer,
+            {
+              backgroundColor: colorTheme.uiBackground,
+              borderColor: colorTheme.border,
+            },
+          ]}
+        >
+          {/* 1. Image Previews nested top row */}
+          {(images.length > 0 || audioUri) && (
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.mediaPreviewList}
+            >
+              {audioUri && (
+                <View style={styles.audioBadge}>
+                  <Ionicons name="mic" size={16} color={Colors.primary} />
+                  <ThemedText style={styles.audioBadgeText}>
+                    Voice note
+                  </ThemedText>
+                  <TouchableOpacity onPress={() => setAudioUri(null)}>
+                    <Ionicons name="close-circle" size={18} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              )}
+              {images.map((uri, index) => (
+                <View key={index} style={styles.imagePreviewWrapper}>
+                  <Image source={{ uri: uri }} style={styles.previewImage} />
+                  <TouchableOpacity
+                    style={styles.removeImageBadge}
+                    onPress={() =>
+                      setImages((prev) => prev.filter((_, i) => i !== index))
+                    }
+                  >
+                    <Ionicons name="close-circle" size={20} color="#ef4444" />
+                  </TouchableOpacity>
+                </View>
+              ))}
+            </ScrollView>
+          )}
+
+          {/* 2. Text Input Area */}
           <ThemedTextInput
-            placeholder="Ask"
+            placeholder="Ask..."
             style={styles.askInput}
             placeholderTextColor="#919ca9"
             multiline={true}
@@ -205,60 +283,67 @@ export default function Chat() {
             onChangeText={setText}
           />
 
-          <TouchableOpacity
-            style={[styles.micButtonWrapper, { right: text ? 36 : 12 }]}
-            onPress={toggleRecording}
-          >
-            <Ionicons
-              name="mic"
-              size={22}
-              style={{
-                color: isRecording
-                  ? "#ef4444"
-                  : theme === "dark"
-                    ? "white"
-                    : "#919ca9",
-              }}
-            />
-          </TouchableOpacity>
-
-          {text ? (
+          {/* 3. Bottom Action Bar */}
+          <View style={styles.inputActionsRow}>
+            {/* Left Action: Add Attachment */}
             <TouchableOpacity
-              style={styles.arrowUpButtonWrapper}
-              onPress={onSend}
-              disabled={!text.trim() || sending}
+              style={styles.actionIconButton}
+              onPress={handleAddDocument}
             >
               <Ionicons
-                name="arrow-up-circle"
-                size={22}
-                style={{ color: Colors.primary }}
+                name={alertVisible ? "close" : "add"}
+                size={24}
+                style={{ color: theme === "dark" ? "white" : "#6b7280" }}
               />
             </TouchableOpacity>
-          ) : null}
 
-          {text ? (
-            <TouchableOpacity
-              style={styles.crossButtonWrapper}
-              onPress={() => setText("")}
-            >
-              <Ionicons
-                name="close-circle"
-                size={22}
-                style={{ color: theme === "dark" ? "white" : "#9ca3af" }}
-              />
-            </TouchableOpacity>
-          ) : null}
+            {/* Right Actions: Clear Text, Mic & Send Button */}
+            <View style={styles.rightActionsRow}>
+              {text.length > 0 && (
+                <TouchableOpacity
+                  style={styles.actionIconButton}
+                  onPress={() => setText("")}
+                >
+                  <Ionicons
+                    name="close-circle"
+                    size={20}
+                    style={{ color: theme === "dark" ? "#9ca3af" : "#919ca9" }}
+                  />
+                </TouchableOpacity>
+              )}
 
-          <TouchableOpacity
-            style={styles.addButtonWrapper}
-            onPress={handleAddDocument}
-          >
-            <Ionicons
-              name={alertVisible ? "close" : "add"}
-              size={22}
-              style={{ color: theme === "dark" ? "white" : "#919ca9" }}
-            />
-          </TouchableOpacity>
+              <TouchableOpacity
+                style={styles.actionIconButton}
+                onPress={toggleRecording}
+              >
+                <Ionicons
+                  name="mic"
+                  size={22}
+                  style={{
+                    color: isRecording
+                      ? "#ef4444"
+                      : theme === "dark"
+                        ? "white"
+                        : "#6b7280",
+                  }}
+                />
+              </TouchableOpacity>
+
+              {(text.trim().length > 0 || images.length > 0 || audioUri) && (
+                <TouchableOpacity
+                  style={styles.sendButton}
+                  onPress={onSend}
+                  disabled={sending}
+                >
+                  <Ionicons
+                    name="arrow-up-circle"
+                    size={28}
+                    style={{ color: Colors.primary }}
+                  />
+                </TouchableOpacity>
+              )}
+            </View>
+          </View>
 
           <CustomChoose
             visible={alertVisible}
@@ -266,6 +351,7 @@ export default function Chat() {
             onChooseGallery={handleChooseGallery}
             colorTheme={colorTheme}
             onClose={() => setAlertVisible(false)}
+            style={{ paddingTop: 420 }}
           />
         </View>
       </KeyboardAvoidingView>
@@ -318,46 +404,92 @@ const styles = StyleSheet.create({
     fontSize: 13,
     opacity: 0.7,
   },
-  inputContainer: {
-    position: "relative", // Allows us to pin the icon cleanly inside this box
-    flexDirection: "row",
-    alignItems: "center",
-    width: "100%",
+  inputBoxContainer: {
+    borderRadius: 24,
+    borderWidth: 1,
+    paddingHorizontal: 12,
+    paddingTop: 10,
+    paddingBottom: 8,
     marginBottom: 12,
+    width: "100%",
+  },
+  mediaPreviewList: {
+    flexDirection: "row",
+    paddingBottom: 8,
+    gap: 10,
+  },
+  imagePreviewWrapper: {
+    position: "relative",
+    marginTop: 4,
+    marginRight: 4,
+  },
+  previewImage: {
+    width: 58,
+    height: 58,
+    borderRadius: 12,
+    backgroundColor: "#e5e7eb",
   },
   askInput: {
-    flex: 1,
-    borderRadius: 25, // Creates a perfectly pill-shaped modern chat input
-    paddingLeft: 70, // Clears space for the left add icon
-    paddingRight: 70, // Clears space for the right cross icon
-    borderWidth: 1,
     fontSize: 16,
+    minHeight: 36,
+    maxHeight: 120,
+    paddingHorizontal: 4,
+    paddingVertical: 4,
+    borderWidth: 0, // Removes inner borders if component had any
   },
-  addButtonWrapper: {
-    position: "absolute",
-    left: 12,
-    bottom: 12,
-    zIndex: 10,
+  inputActionsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 6,
+  },
+  rightActionsRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+  },
+  actionIconButton: {
     padding: 4,
   },
-  crossButtonWrapper: {
-    position: "absolute",
-    left: 36,
-    bottom: 12,
-    zIndex: 10,
-    padding: 4,
+  sendButton: {
+    padding: 2,
   },
-  micButtonWrapper: {
+  removeImageBadge: {
     position: "absolute",
-    bottom: 12,
+    top: -6,
+    right: -6,
+    backgroundColor: "#ffffff",
+    borderRadius: 10,
     zIndex: 10,
-    padding: 4,
   },
-  arrowUpButtonWrapper: {
-    position: "absolute",
-    right: 12,
-    bottom: 12,
-    zIndex: 10,
-    padding: 4,
+  audioBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    backgroundColor: "rgba(0,0,0,0.05)",
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 12,
+    marginRight: 6,
+  },
+  audioBadgeText: {
+    fontSize: 12,
+  },
+  bubbleImagesGrid: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+    marginBottom: 6,
+  },
+  bubbleImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 8,
+  },
+  bubbleAudioRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: 4,
   },
 });

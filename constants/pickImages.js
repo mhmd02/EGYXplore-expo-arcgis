@@ -10,12 +10,12 @@ export const pickImageFromGallery = async () => {
 
   let result = await ImagePicker.launchImageLibraryAsync({
     mediaTypes: ["images"],
-    allowsEditing: true,
     aspect: [1, 1],
     quality: 0.7,
+    allowsMultipleSelection: true,
   });
   if (!result.canceled && result.assets && result.assets.length > 0) {
-    return result.assets[0].uri;
+    return result.assets.map((asset) => asset.uri);
   }
   return null;
 };

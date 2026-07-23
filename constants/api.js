@@ -1,114 +1,73 @@
-// Minimal API client for the Tourism backend (Tourist_Project_MVC).
-//
-// Backs the AI chat screen and, optionally, mobile login. Two endpoints:
-//   POST /api/auth/login  -> { token, expiresAtUtc, email, roles }
-//   POST /AiChat/Send      -> { reply, tripSaved, tripPlanId, tripPlanTitle }
-//
-// /AiChat/Send works ANONYMOUSLY — you can chat with no token at all. A token
-// is only needed for the AI to *save* a trip (requires a signed-in "User").
-
-// Set EXPO_PUBLIC_API_BASE in your .env file — no code change needed.
-// See .env.example for the format.
-const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "http://localhost:5217";
-
-// --- Token storage -----------------------------------------------------------
-// Kept in memory by default so this file has zero hard dependencies and never
-// crashes on import. If you install @react-native-async-storage/async-storage,
-// the token is also persisted across app restarts automatically — no code
-// change needed here.
-const TOKEN_KEY = "auth_token";
-let inMemoryToken = null;
-
-// Lazily grab AsyncStorage only if it's actually installed. Returns null
-// otherwise, in which case we fall back to the in-memory token.
-function getAsyncStorage() {
-  try {
-    // eslint-disable-next-line global-require
-    return require("@react-native-async-storage/async-storage").default;
-  } catch {
-    return null;
-  }
-}
-
-async function saveToken(token) {
-  inMemoryToken = token;
-  const storage = getAsyncStorage();
-  if (storage) {
-    try {
-      await storage.setItem(TOKEN_KEY, token);
-    } catch {
-      // Persistence is best-effort; the in-memory copy still works this session.
-    }
-  }
-}
-
-export async function getToken() {
-  if (inMemoryToken) return inMemoryToken;
-  const storage = getAsyncStorage();
-  if (storage) {
-    try {
-      inMemoryToken = await storage.getItem(TOKEN_KEY);
-    } catch {
-      inMemoryToken = null;
-    }
-  }
-  return inMemoryToken;
-}
-
-export async function logout() {
-  inMemoryToken = null;
-  const storage = getAsyncStorage();
-  if (storage) {
-    try {
-      await storage.removeItem(TOKEN_KEY);
-    } catch {
-      // Ignore — clearing the in-memory copy is what matters for this session.
-    }
-  }
-}
-
-// --- Auth --------------------------------------------------------------------
-// Returns { token, expiresAtUtc, email, roles }. Only needed if you want the
-// AI to save trips; anonymous chat doesn't require this.
-export async function login(email, password) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true", // prevents ngrok interstitial page
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Login failed" }));
-    throw new Error(err.error || "Login failed");
-  }
-
-  const data = await res.json(); // { token, expiresAtUtc, email, roles }
-  await saveToken(data.token);
-  return data;
-}
-
 // --- AI chat -----------------------------------------------------------------
-// message: the new user message (string).
-// history: prior turns of THIS conversation, EXCLUDING the new message — an
-//          array of { role: "user" | "assistant", content: string }. The
-//          backend expects the new message separately in `message`, so don't
-//          include it in history. Keep it short (the web widget caps at ~12).
+// message: string text
+// history: prior turns array
+// images: array of image URI strings
+// audioUri: audio file URI string
 // Returns { reply, tripSaved, tripPlanId, tripPlanTitle }.
-export async function sendChatMessage(message, history = []) {
+export async function sendChatMessage(
+  message,
+  history = [],
+  images = [],
+  audioUri = null,
+) {
   const token = await getToken();
+  const hasAttachments = images.length > 0 || !!audioUri;
+
+  // Base headers shared across JSON and FormData requests
+  const headers = {
+    "ngrok-skip-browser-warning": "true",
+    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+  };
+
+  let body;
+
+  if (hasAttachments) {
+    // 1. Build FormData for multipart upload
+    const formData = new FormData();
+    formData.append("message", message);
+    formData.append("history", JSON.stringify(history));
+
+    // Append Images
+    images.forEach((uri, index) => {
+      const filename = uri.split("/").pop() || `image_${index}.jpg`;
+      const match = /\.(\w+)$/.exec(filename);
+      const ext = match ? match[1].toLowerCase() : "jpg";
+      const mimeType = ext === "png" ? "image/png" : "image/jpeg";
+
+      formData.append("images", {
+        uri,
+        name: filename,
+        type: mimeType,
+      });
+    });
+
+    // Append Audio
+    if (audioUri) {
+      const filename = audioUri.split("/").pop() || "audio.m4a";
+      const match = /\.(\w+)$/.exec(filename);
+      const ext = match ? match[1].toLowerCase() : "m4a";
+      const mimeType = ext === "m4a" ? "audio/x-m4a" : `audio/${ext}`;
+
+      formData.append("audio", {
+        uri: audioUri,
+        name: filename,
+        type: mimeType,
+      });
+    }
+
+    body = formData;
+    // NOTE: Do NOT set 'Content-Type': 'multipart/form-data' here!
+    // Fetch automatically generates the boundary header for FormData.
+  } else {
+    // 2. Fall back to standard JSON payload when no attachments exist
+    headers["Content-Type"] = "application/json";
+    body = JSON.stringify({ message, history });
+  }
 
   const res = await fetch(`${API_BASE}/AiChat/Send`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true", // prevents ngrok interstitial page
-      // Omit the header entirely when anonymous — chat still works.
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
-    body: JSON.stringify({ message, history }),
+    headers,
+    body,
   });
 
   if (res.status === 401) {
@@ -118,12 +77,10 @@ export async function sendChatMessage(message, history = []) {
   }
 
   if (!res.ok) {
-    const body = await res.text().catch(() => "(unreadable)");
-    console.error(`[AiChat] ${res.status} ${res.statusText}:`, body);
-    throw new Error(`[${res.status}] ${body || res.statusText}`);
+    const errorText = await res.text().catch(() => "(unreadable)");
+    console.error(`[AiChat] ${res.status} ${res.statusText}:`, errorText);
+    throw new Error(`[${res.status}] ${errorText || res.statusText}`);
   }
 
   return res.json(); // { reply, tripSaved, tripPlanId, tripPlanTitle }
 }
-
-export { API_BASE };
