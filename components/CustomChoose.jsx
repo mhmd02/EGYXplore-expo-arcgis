@@ -15,6 +15,7 @@ export default function CustomChoose({
   onTakePhoto,
   onChooseGallery,
   colorTheme,
+  style,
 }) {
   const isDark = colorTheme.background === "#101521";
   const menuBgColor = isDark ? "#1E1F22" : "#FFFFFF";
@@ -29,7 +30,7 @@ export default function CustomChoose({
       statusBarTranslucent={true}
     >
       <TouchableWithoutFeedback onPress={onClose}>
-        <View style={styles.backdrop}>
+        <View style={[styles.backdrop, style]}>
           {/* Prevent taps inside the menu from closing the modal */}
           <TouchableWithoutFeedback>
             <View
