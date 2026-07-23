@@ -57,8 +57,33 @@ export default function Chat() {
   };
 
   async function handleRecordingComplete(uri) {
-    // Voice upload stays stubbed until the expo-audio migration lands.
-    console.log("Recording complete (not yet wired to AI):", uri);
+    try {
+      const filename = uri.split("/").pop();
+      const match = /\.(\w+)$/.exec(filename);
+      const ext = match ? match[1] : "m4a";
+      const mimeType = ext === "m4a" ? "audio/x-m4a" : `audio/${ext}`;
+
+      const formData = new FormData();
+      formData.append("audio", {
+        uri: uri,
+        name: filename,
+        type: mimeType,
+      });
+
+      console.log("Sending file to AI Agent...", filename); // --- SEND TO AI API ---
+      // const response = await fetch("https://your-api.com/analyze", {
+      //   method: "POST",
+      //   body: formData,
+      // });
+      // const result = await response.json();
+      // console.log("AI Response:", result);
+    } catch (uploadError) {
+      console.error("Upload failed:", uploadError);
+      Alert.alert(
+        "Upload Failed",
+        "Could not send the voice message to the server.",
+      );
+    }
   }
 
   const handleAddDocument = () => {
