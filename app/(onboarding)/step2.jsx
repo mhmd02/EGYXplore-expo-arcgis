@@ -9,13 +9,21 @@ import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
 
 import { takePhoto, pickImageFromGallery } from "../../constants/pickImages";
-import CustomAlert from "../../components/CustomAlert";
 import { useUser } from "../../context/UserContext";
+import { UriContext } from "../../context/UriContext";
+import CustomAlert from "../../components/CustomAlert";
 
 export default function Step2() {
   const router = useRouter();
-  const [profileImage, setProfileImage] = useState(null);
-  const [alertVisible, setAlertVisible] = useState(false);
+
+  const {
+    profileImage,
+    setProfileImage,
+    alertVisible,
+    setAlertVisible,
+    handleTakePhoto,
+    handleChooseGallery,
+  } = useContext(UriContext);
 
   const { theme } = useContext(ThemeContext);
 
@@ -24,17 +32,9 @@ export default function Step2() {
   const colorTheme = Colors[theme] || Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  const handleTakePhoto = async () => {
-    const uri = await takePhoto();
-    if (uri) setProfileImage(uri);
-    setAlertVisible(false);
-  };
-
-  const handleChooseGallery = async () => {
-    const uri = await pickImageFromGallery();
-    if (uri) setProfileImage(uri);
-    setAlertVisible(false);
-  };
+  const imageName = profileImage
+    ? profileImage.split("/").pop()
+    : "Selected image";
 
   return (
     <ThemedView style={styles.container} safe={true}>

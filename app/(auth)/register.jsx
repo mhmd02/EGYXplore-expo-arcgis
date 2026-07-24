@@ -4,6 +4,7 @@ import {
   TouchableWithoutFeedback,
   Text,
   View,
+  TouchableOpacity,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { useContext, useMemo, useState } from "react";
@@ -17,7 +18,12 @@ import ThemedButton from "../../components/ThemedButton";
 import Spacer from "../../components/Spacer";
 import { Colors } from "../../constants/Colors";
 import { useUser } from "../../context/UserContext";
-
+import { UriContext } from "../../context/UriContext";
+import CustomAlert from "../../components/CustomAlert";
+import { Ionicons } from "@expo/vector-icons";
+import { registerSchema } from "../../schema/authSchema";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
 export default function Register() {
   const router = useRouter();
   const { theme, setTheme } = useContext(ThemeContext);
@@ -26,19 +32,40 @@ export default function Register() {
 
   // Add-Input-to-Context using controlled elements
   const { updateUser } = useUser();
-  const [firstName, setFirstName] = useState("");
-  const [lastName, setLastName] = useState("");
-  const [sex, setSex] = useState("");
-  const [country, setCountry] = useState("");
-  const [phone, setPhone] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [confirmPassword, setConfirmPassword] = useState("");
+  const {
+    profileImage,
+    setProfileImage,
+    alertVisible,
+    setAlertVisible,
+    handleTakePhoto,
+    handleChooseGallery,
+  } = useContext(UriContext);
+  const {
+    control,
+    handleSubmit,
+    formState: { errors },
+  } = useForm({
+    resolver: zodResolver(registerSchema),
+    defaultValues: {
+      firstName: "",
+      lastName: "",
+      email: "",
+      password: "",
+      confirmPassword: "",
+      phone: "",
+      country: "",
+    },
+  });
 
-  const handleRegister = () => {
-    updateUser({ firstName, lastName, sex, country, phone, email });
+  const imageName = profileImage
+    ? profileImage.split("/").pop()
+    : "Selected image";
+
+  const onSubmit = (data) => {
+    updateUser({ ...data, profileImage });
     router.push("/step1");
   };
+
   return (
     <ThemedView style={styles.container} safe={true}>
       <KeyboardAwareScrollView
@@ -54,78 +81,187 @@ export default function Register() {
       >
         <Spacer height={5} />
         <View style={{ flexDirection: "row", width: "100%", gap: 10 }}>
-          <ThemedTextInput
-            style={[styles.inputField, { flex: 1 }]}
-            placeholder="First name"
-            placeholderTextColor={colorTheme.placeholder}
-            value={firstName}
-            onChangeText={setFirstName}
-          />
-          <ThemedTextInput
-            style={[styles.inputField, { flex: 1 }]}
-            placeholder="Last name"
-            placeholderTextColor={colorTheme.placeholder}
-            value={lastName}
-            onChangeText={setLastName}
-          />
+          <View style={{ flex: 1 }}>
+            <Controller
+              control={control}
+              name="firstName"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <ThemedTextInput
+                  style={styles.inputField}
+                  placeholder="First name"
+                  placeholderTextColor={colorTheme.placeholder}
+                  value={value}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                />
+              )}
+            />
+            {errors.firstName && (
+              <Text style={styles.errorText}>{errors.firstName.message}</Text>
+            )}
+          </View>
+
+          <View style={{ flex: 1 }}>
+            <Controller
+              control={control}
+              name="lastName"
+              render={({ field: { onChange, onBlur, value } }) => (
+                <ThemedTextInput
+                  style={styles.inputField}
+                  placeholder="Last name"
+                  placeholderTextColor={colorTheme.placeholder}
+                  value={value}
+                  onBlur={onBlur}
+                  onChangeText={onChange}
+                />
+              )}
+            />
+            {errors.lastName && (
+              <Text style={styles.errorText}>{errors.lastName.message}</Text>
+            )}
+          </View>
         </View>
 
-        {/* Sex & Country Side-by-Side */}
-        <View style={{ flexDirection: "row", width: "100%", gap: 10 }}>
-          <ThemedTextInput
-            style={[styles.inputField, { flex: 1 }]}
-            placeholder="Sex"
-            placeholderTextColor={colorTheme.placeholder}
-            value={sex}
-            onChangeText={setSex}
-          />
-          <ThemedTextInput
-            style={[styles.inputField, { flex: 1 }]}
-            placeholder="Country"
-            placeholderTextColor={colorTheme.placeholder}
-            value={country}
-            onChangeText={setCountry}
-          />
-        </View>
+        <Controller
+          control={control}
+          name="email"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <ThemedTextInput
+              style={styles.inputField}
+              placeholder="Email"
+              keyboardType="email-address"
+              placeholderTextColor={colorTheme.placeholder}
+              value={value}
+              onBlur={onBlur}
+              onChangeText={onChange}
+              autoCapitalize="none"
+            />
+          )}
+        />
+        {errors.email && (
+          <Text style={styles.errorText}>{errors.email.message}</Text>
+        )}
 
-        <ThemedTextInput
-          style={styles.inputField}
-          placeholder="Phone"
-          keyboardType="phone-pad"
-          placeholderTextColor={colorTheme.placeholder}
-          value={phone}
-          onChangeText={setPhone}
+        <Controller
+          control={control}
+          name="password"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <ThemedTextInput
+              style={styles.inputField}
+              placeholder="Password"
+              placeholderTextColor={colorTheme.placeholder}
+              secureTextEntry
+              value={value}
+              onBlur={onBlur}
+              onChangeText={onChange}
+              autoCapitalize="none"
+            />
+          )}
         />
-        <ThemedTextInput
-          style={styles.inputField}
-          placeholder="Email"
-          keyboardType="email-address"
-          placeholderTextColor={colorTheme.placeholder}
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
+        {errors.password && (
+          <Text style={styles.errorText}>{errors.password.message}</Text>
+        )}
+
+        <Controller
+          control={control}
+          name="confirmPassword"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <ThemedTextInput
+              style={styles.inputField}
+              placeholder="Confirm Password"
+              placeholderTextColor={colorTheme.placeholder}
+              secureTextEntry
+              value={value}
+              onBlur={onBlur}
+              onChangeText={onChange}
+              autoCapitalize="none"
+            />
+          )}
         />
-        <ThemedTextInput
-          style={styles.inputField}
-          placeholder="Password"
-          placeholderTextColor={colorTheme.placeholder}
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-          autoCapitalize="none"
+        {errors.confirmPassword && (
+          <Text style={styles.errorText}>{errors.confirmPassword.message}</Text>
+        )}
+
+        <Controller
+          control={control}
+          name="phone"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <ThemedTextInput
+              style={styles.inputField}
+              placeholder="Phone"
+              keyboardType="phone-pad"
+              placeholderTextColor={colorTheme.placeholder}
+              value={value}
+              onBlur={onBlur}
+              onChangeText={onChange}
+            />
+          )}
         />
-        <ThemedTextInput
-          style={styles.inputField}
-          placeholder="Confirm Password"
-          placeholderTextColor={colorTheme.placeholder}
-          secureTextEntry
-          value={confirmPassword}
-          onChangeText={setConfirmPassword}
-          autoCapitalize="none"
+        {errors.phone && (
+          <Text style={styles.errorText}>{errors.phone.message}</Text>
+        )}
+        <Controller
+          control={control}
+          name="country"
+          render={({ field: { onChange, onBlur, value } }) => (
+            <ThemedTextInput
+              style={styles.inputField}
+              placeholder="Nationality"
+              placeholderTextColor={colorTheme.placeholder}
+              value={value}
+              onBlur={onBlur}
+              onChangeText={onChange}
+            />
+          )}
         />
+        <View style={styles.imageUploadField}>
+          <TouchableOpacity
+            style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
+            onPress={() => setAlertVisible(true)}
+          >
+            {profileImage ? (
+              <Text
+                style={{ color: colorTheme.text }}
+                numberOfLines={1}
+                ellipsizeMode="middle"
+              >
+                {imageName}
+              </Text>
+            ) : (
+              <>
+                <Ionicons
+                  name="image-outline"
+                  size={20}
+                  color={colorTheme.placeholder}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={{ color: colorTheme.placeholder }}>
+                  Choose Photo
+                </Text>
+              </>
+            )}
+          </TouchableOpacity>
+          {profileImage ? (
+            <TouchableOpacity
+              onPress={() => setProfileImage("")}
+              style={styles.removeImageButton}
+            >
+              <Text style={styles.removeImageText}>✕</Text>
+            </TouchableOpacity>
+          ) : null}
+        </View>
+        {alertVisible && (
+          <CustomAlert
+            visible={alertVisible}
+            onClose={() => setAlertVisible(false)}
+            onTakePhoto={handleTakePhoto}
+            onChooseGallery={handleChooseGallery}
+            colorTheme={colorTheme}
+          />
+        )}
         <Spacer height={12} />
         <View>
-          <ThemedButton onPress={handleRegister}>
+          <ThemedButton onPress={handleSubmit(onSubmit)}>
             <Text style={{ color: "#f2f2f2", textAlign: "center" }}>
               Register
             </Text>
@@ -149,22 +285,6 @@ const createStyles = (colorTheme) =>
       flex: 1,
       backgroundColor: colorTheme.background,
     },
-    headerContainer: {
-      alignItems: "center",
-      marginBottom: 10,
-    },
-    title: {
-      fontSize: 28,
-      fontWeight: "800",
-      color: colorTheme.title,
-      textAlign: "center",
-      marginBottom: 4,
-    },
-    subTitle: {
-      fontSize: 14,
-      color: colorTheme.text,
-      textAlign: "center",
-    },
     inputField: {
       marginBottom: 12,
       borderRadius: 12,
@@ -173,47 +293,32 @@ const createStyles = (colorTheme) =>
       paddingHorizontal: 16,
       backgroundColor: colorTheme.background,
     },
-    submitButton: {
-      width: "100%",
-      height: 52,
-      borderRadius: 12,
-      backgroundColor: "#C19A6B",
-      justifyContent: "center",
-      alignItems: "center",
-    },
-    submitButtonText: {
-      color: "#FFFFFF",
-      textAlign: "center",
-      fontSize: 16,
-      fontWeight: "700",
-    },
-    footerLinks: {
+    imageUploadField: {
       flexDirection: "row",
-      justifyContent: "center",
       alignItems: "center",
+      justifyContent: "space-between",
+      minHeight: 52, // Ensures it has enough height even without text input padding
+      paddingVertical: 14,
     },
-    footerText: {
-      fontSize: 14,
-      color: "#64748B",
+    removeImageButton: {
+      padding: 2,
+      marginLeft: 8,
+      backgroundColor: colorTheme.border,
+      borderRadius: 12,
+      width: 24,
+      height: 24,
+      alignItems: "center",
+      justifyContent: "center",
     },
-    inlineLink: {
-      fontSize: 14,
-      fontWeight: "700",
-      color: "#C19A6B",
+    removeImageText: {
+      color: colorTheme.text,
+      fontSize: 12,
+      fontWeight: "bold",
     },
-    secondaryLinkText: {
-      fontSize: 13,
-      color: "#94A3B8",
-      textAlign: "center",
-      textDecorationLine: "underline",
-    },
-    error: {
-      color: Colors.warning,
-      padding: 10,
-      backgroundColor: "#f5c1c8",
-      borderColor: Colors.warning,
-      borderWidth: 1,
-      borderRadius: 6,
-      marginHorizontal: 10,
+    errorText: {
+      color: "#FF3B30",
+      fontSize: 11,
+      marginBottom: 8,
+      marginLeft: 4,
     },
   });

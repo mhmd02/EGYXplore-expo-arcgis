@@ -18,7 +18,10 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemeContext } from "../../../context/ThemeContext";
 import { Colors } from "../../../constants/Colors";
-import { takePhoto, pickImageFromGallery } from "../../../constants/pickImages";
+import {
+  takePhoto,
+  pickImageFromGalleryMultiple,
+} from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
 import { sendChatMessage } from "../../../constants/api";
 import ThemedText from "../../../components/ThemedText";
@@ -52,7 +55,7 @@ export default function Chat() {
   };
 
   const handleChooseGallery = async () => {
-    const results = await pickImageFromGallery();
+    const results = await pickImageFromGalleryMultiple();
     if (results) {
       if (Array.isArray(results)) {
         setImages((prevImages) => [...prevImages, ...results]);
