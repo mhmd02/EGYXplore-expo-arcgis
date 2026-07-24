@@ -1,8 +1,8 @@
 import { useAudioPlayer, useAudioPlayerStatus } from "expo-audio";
 import { TouchableOpacity, StyleSheet } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import ThemedText from "./ThemedText";
 import { useEvent } from "expo";
+import ThemedText from "./ThemedText";
 export default function VoiceNotePlayer({ uri, style, colorTheme }) {
   const player = useAudioPlayer(uri);
   const status = useAudioPlayerStatus(player);

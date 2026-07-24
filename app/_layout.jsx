@@ -6,6 +6,7 @@ import { Colors } from "../constants/Colors";
 import { ProgressProvider } from "../context/ProgressContext";
 import { UserProvider } from "../context/UserContext";
 import SettingsProvider from "../context/SettingsContext";
+import UriProvider from "../context/UriContext";
 
 function MainLayout() {
   const context = useContext(ThemeContext);
@@ -43,7 +44,9 @@ export default function RootLayout() {
       <ProgressProvider>
         <UserProvider>
           <SettingsProvider>
-            <MainLayout />
+            <UriProvider>
+              <MainLayout />
+            </UriProvider>
           </SettingsProvider>
         </UserProvider>
       </ProgressProvider>
