@@ -1,8 +1,8 @@
 export const ARCGIS_API_KEY = process.env.EXPO_PUBLIC_ARCGIS_API_KEY;
 export const ARCGIS_LICENSE_KEY = process.env.EXPO_PUBLIC_ARCGIS_LICENSE_KEY;
 export const FEATURE_LAYERS = {
-  metroStations: process.env.EXPO_PUBLIC_ARCGIS_METRO_STATIONS_URL,
-  metroLines: process.env.EXPO_PUBLIC_ARCGIS_METRO_LINES_URL,
+  destination: process.env.EXPO_PUBLIC_ARCGIS_DESTINATION_URL,
+  branches: process.env.EXPO_PUBLIC_ARCGIS_BRANCHES_URL,
 };
 
 export const MAP_CENTER = {
