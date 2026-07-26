@@ -18,6 +18,13 @@ export const Colors = {
     iconColorFocused: "#000000", // Pops with your primary brand color when active
 
     border: "#E2E8F0", // Very soft border line to separate list items
+
+    // --- Map Specific Colors ---
+    mapText: "#FFFFFF", // White text on Ocean Blue
+    mapDestination: "#0284C7", // Professional Ocean Blue for light maps
+    mapBranch: "#F59E0B", // Warm Sun Orange
+    mapLabelText: "#0F172A",
+    mapLabelHalo: "#FFFFFF",
   },
 
   // --- Dark Theme ---
@@ -33,5 +40,12 @@ export const Colors = {
     iconColorFocused: "#feffff", // A lighter, glowing "Sky Blue" that stands out better on dark backgrounds
 
     border: "#334155", // Subtle dark divider line
+
+    // --- Map Specific Colors ---
+    mapText: "#0F172A", // Dark Navy text on Bright Sky Blue for readable contrast
+    mapDestination: "#38BDF8", // Bright Sky Blue to pop on dark slate maps
+    mapBranch: "#FCD34D", // Glowing Gold
+    mapLabelText: "#FFFFFF",
+    mapLabelHalo: "#1E293B",
   },
 };

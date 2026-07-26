@@ -83,7 +83,10 @@ export default function Chat() {
     if ((!trimmed && images.length === 0 && !audioUri) || sending) return;
 
     Keyboard.dismiss();
-    const history = messages.slice(-16); // prior turns, before this message
+    // Before sending — strip images/audio from history
+    const history = messages
+      .slice(-16)
+      .map(({ role, content }) => ({ role, content })); // prior turns, before this message
     const currentImages = [...images];
     const currentAudio = audioUri;
 

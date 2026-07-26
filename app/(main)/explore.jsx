@@ -1,4 +1,4 @@
-import { useContext, useRef, useState, useEffect } from "react";
+import { useContext, useRef, useState, useEffect, useMemo } from "react";
 import {
   Text,
   View,
@@ -11,6 +11,7 @@ import {
   AppState,
   Alert,
   ActivityIndicator,
+  ScrollView,
 } from "react-native";
 import {
   MapSettings,
@@ -20,6 +21,7 @@ import {
   GraphicsOverlay,
   Graphic,
   geocoder,
+  geometryEngine,
 } from "expo-arcgis";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -37,26 +39,7 @@ import {
   MAP_CENTER,
 } from "../../config/arcgis.js";
 
-// Renderers ported from the old WebView getEsriMaps()
-const metroStationsRenderer = {
-  type: "simple",
-  symbol: {
-    type: "simple-marker",
-    size: 6,
-    color: "blue",
-    outline: { width: 0.5, color: "black" },
-  },
-};
-
-const metroLinesRenderer = {
-  type: "simple",
-  symbol: {
-    type: "simple-line",
-    width: 2,
-    color: "green",
-  },
-};
-
+// Dynamic renderers are generated inside the component based on ThemeContext.
 // Marker dropped on the map for a geocoded search result (a one-off graphic,
 // not part of a data layer). A red diamond keeps it distinct from the blue
 // station markers and green metro lines.
@@ -69,11 +52,11 @@ const searchMarkerSymbol = {
 };
 
 // The native `identify` returns the layer's title (layerName), while CustomPopup
-// keys off the old WebView layer ids ("metropoints" / "metrolines"). Map between them.
+// keys off the old WebView layer ids. Map between them.
 const layerNameToId = (layerName = "") => {
   const name = layerName.toLowerCase();
-  if (name.includes("line")) return "metrolines";
-  if (name.includes("station")) return "metropoints";
+  if (name.includes("destination")) return "destination";
+  if (name.includes("branch")) return "branches";
   return null;
 };
 
@@ -98,18 +81,71 @@ export default function Explore() {
   const [searchPoint, setSearchPoint] = useState(null);
   const searchRef = useRef();
   const mapViewRef = useRef(null);
+  const destLayerRef = useRef(null);
+  const branchesLayerRef = useRef(null);
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [clickLocation, setClickLocation] = useState(null);
   const [layerInfo, setLayerInfo] = useState(null);
   const [highlightGraphic, setHighlightGraphic] = useState(null);
-  //To move the map dynamically on search
   const [mapViewpoint, setMapViewpoint] = useState(null);
+
+  // Filter states
+  const [showLandmarks, setShowLandmarks] = useState(true);
+  const [showBranches, setShowBranches] = useState(true);
 
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
 
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
+
+  // Dynamic renderers connected to ThemeContext, wrapped in useMemo for optimal performance
+  const destinationRenderer = useMemo(
+    () => ({
+      type: "simple",
+      symbol: {
+        type: "simple-marker",
+        style: "circle",
+        size: 18,
+        color: `${colorTheme.mapDestination}E6`, // 90% Opacity
+        outline: { color: "#FFFFFF", width: 3 },
+      },
+    }),
+    [colorTheme.mapDestination],
+  );
+
+  const branchesRenderer = useMemo(
+    () => ({
+      type: "simple",
+      symbol: {
+        type: "simple-marker",
+        style: "circle",
+        size: 16,
+        color: `${colorTheme.mapBranch}E6`, // 90% Opacity
+        outline: { color: "#FFFFFF", width: 2.5 },
+      },
+    }),
+    [colorTheme.mapBranch],
+  );
+
+  const labelConfig = useMemo(
+    () => [
+      {
+        expression: "IIF($view.scale <= 15000, $feature.Name, '')",
+        useArcade: true,
+        symbol: {
+          type: "text",
+          color: colorTheme.mapLabelText,
+          size: 10,
+          haloColor: colorTheme.mapLabelHalo,
+          haloWidth: 1.5,
+          verticalAlignment: "baseline",
+          fontFamily: "sans-serif-medium",
+        },
+      },
+    ],
+    [colorTheme.mapLabelText, colorTheme.mapLabelHalo],
+  );
 
   const checkLocationStatus = async () => {
     const { status } = await Location.getForegroundPermissionsAsync();
@@ -199,7 +235,66 @@ export default function Explore() {
     if (!searchQuery.trim()) return;
     if (isSearching) return; // Guard against double-submits while a search is in flight
     setIsSearching(true);
+
     try {
+      const term = searchQuery.trim().toLowerCase();
+      const whereClause = `LOWER(Name) LIKE '%${term}%'`;
+
+      // 1. Search local Destinations first
+      if (destLayerRef.current) {
+        const destResults = await destLayerRef.current.queryFeatures({
+          whereClause,
+        });
+        if (destResults && destResults.length > 0) {
+          const feature = destResults[0];
+          const pt = feature.geometry;
+          if (pt) {
+            // Project native Web Mercator coordinates to WGS84 (Lat/Lon)
+            const projectedPt = geometryEngine.project(pt, 4326);
+            if (projectedPt) {
+              const lat = projectedPt.y;
+              const lon = projectedPt.x;
+              setMapViewpoint({ latitude: lat, longitude: lon, scale: 15000 });
+              setSearchPoint({ latitude: lat, longitude: lon });
+              setClickLocation({ latitude: lat, longitude: lon });
+              setSelectedFeature(feature.attributes);
+              setLayerInfo("destination");
+              setShowLandmarks(true); // Automatically unhide the layer if it was off!
+              setIsSearching(false);
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. Search local Branches next
+      if (branchesLayerRef.current) {
+        const branchResults = await branchesLayerRef.current.queryFeatures({
+          whereClause,
+        });
+        if (branchResults && branchResults.length > 0) {
+          const feature = branchResults[0];
+          const pt = feature.geometry;
+          if (pt) {
+            // Project native Web Mercator coordinates to WGS84 (Lat/Lon)
+            const projectedPt = geometryEngine.project(pt, 4326);
+            if (projectedPt) {
+              const lat = projectedPt.y;
+              const lon = projectedPt.x;
+              setMapViewpoint({ latitude: lat, longitude: lon, scale: 15000 });
+              setSearchPoint({ latitude: lat, longitude: lon });
+              setClickLocation({ latitude: lat, longitude: lon });
+              setSelectedFeature(feature.attributes);
+              setLayerInfo("branches");
+              setShowBranches(true); // Automatically unhide the layer if it was off!
+              setIsSearching(false);
+              return;
+            }
+          }
+        }
+      }
+
+      // 3. Fallback to Global ArcGIS Geocoder
       // This sends "Cairo", for example, to the ArcGIS servers
       const results = await geocoder.geocode(searchQuery);
       if (!results || results.length === 0) {
@@ -207,6 +302,7 @@ export default function Explore() {
           "No Results",
           "Could not find any place matching your search.",
         );
+        setIsSearching(false);
         return;
       }
       const bestMatch = results[0];
@@ -232,7 +328,7 @@ export default function Explore() {
         setLayerInfo(null); // It's a general place, not a metro station
       }
     } catch (err) {
-      console.warn("Geocoding Error:", err);
+      console.warn("Search Error:", err);
       Alert.alert("Error", "Something went wrong while searching");
     } finally {
       setIsSearching(false);
@@ -353,14 +449,26 @@ export default function Explore() {
                 scale: 250000,
               }}
             >
-              <FeatureLayer
-                url={FEATURE_LAYERS.metroLines}
-                renderer={metroLinesRenderer}
-              />
-              <FeatureLayer
-                url={FEATURE_LAYERS.metroStations}
-                renderer={metroStationsRenderer}
-              />
+              {FEATURE_LAYERS.destination && (
+                <FeatureLayer
+                  ref={destLayerRef}
+                  visible={showLandmarks}
+                  url={FEATURE_LAYERS.destination}
+                  renderer={destinationRenderer}
+                  labelsEnabled={true}
+                  labels={labelConfig}
+                />
+              )}
+              {FEATURE_LAYERS.branches && (
+                <FeatureLayer
+                  ref={branchesLayerRef}
+                  visible={showBranches}
+                  url={FEATURE_LAYERS.branches}
+                  renderer={branchesRenderer}
+                  labelsEnabled={true}
+                  labels={labelConfig}
+                />
+              )}
               <MapView
                 ref={mapViewRef}
                 style={styles.map}
@@ -466,6 +574,51 @@ export default function Explore() {
                 )}
               </View>
             </View>
+
+            {/* Filter Pills */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={styles.filterContainer}
+              contentContainerStyle={styles.filterContent}
+            >
+              <TouchableOpacity
+                style={[
+                  styles.filterPill,
+                  showLandmarks && styles.filterPillActive,
+                  showLandmarks && {
+                    backgroundColor: colorTheme.mapDestination,
+                  },
+                ]}
+                onPress={() => setShowLandmarks(!showLandmarks)}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    showLandmarks && { color: colorTheme.mapText },
+                  ]}
+                >
+                  Landmarks
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[
+                  styles.filterPill,
+                  showBranches && styles.filterPillActive,
+                  showBranches && { backgroundColor: colorTheme.mapBranch },
+                ]}
+                onPress={() => setShowBranches(!showBranches)}
+              >
+                <Text
+                  style={[
+                    styles.filterText,
+                    showBranches && { color: colorTheme.mapText },
+                  ]}
+                >
+                  Near me "Branches"
+                </Text>
+              </TouchableOpacity>
+            </ScrollView>
           </View>
         </TouchableWithoutFeedback>
         {/* My Location Button - Floating at the bottom right */}
@@ -513,6 +666,30 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     paddingRight: 70,
   },
+  filterContainer: {
+    marginTop: 10,
+  },
+  filterContent: {
+    paddingHorizontal: 4,
+    paddingBottom: 4,
+  },
+  filterPill: {
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 20,
+    backgroundColor: "#E2E8F0",
+    marginRight: 8,
+    borderWidth: 1,
+    borderColor: "#CBD5E1",
+  },
+  filterPillActive: {
+    borderColor: "#FFFFFF",
+  },
+  filterText: {
+    fontSize: 13,
+    fontWeight: "600",
+    color: "#475569",
+  },
   iconContainer: {
     position: "absolute",
     right: 12,
@@ -521,7 +698,7 @@ const styles = StyleSheet.create({
   },
   iconButton: {
     padding: 4,
-    marginLeft: 4,
+    marginLeft: 6,
   },
   requestBar: {
     position: "absolute",
