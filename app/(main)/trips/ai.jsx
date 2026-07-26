@@ -23,7 +23,7 @@ import {
   pickImageFromGalleryMultiple,
 } from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
-import { sendChatMessage } from "../../../constants/api";
+import { sendChatMessage } from "../../../api/aiApi";
 import ThemedText from "../../../components/ThemedText";
 import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedView from "../../../components/ThemedView";

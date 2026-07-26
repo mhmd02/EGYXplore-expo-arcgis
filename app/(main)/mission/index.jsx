@@ -24,6 +24,7 @@ export default function Missions() {
   const { isCompleted } = useProgress();
   const [selectedType, setSelectedType] = useState("All");
   const tabBarClearance = useTabBarClearance();
+  
   const visibleMissions = (
     selectedType === "All"
       ? [...MISSIONS]

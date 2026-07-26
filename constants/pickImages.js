@@ -31,6 +31,7 @@ export const pickImageFromGallery = async () => {
     mediaTypes: ["images"],
     aspect: [1, 1],
     quality: 0.7,
+    allowsEditing: true,
   });
   if (!result.canceled && result.assets && result.assets.length > 0) {
     return result.assets[0].uri;

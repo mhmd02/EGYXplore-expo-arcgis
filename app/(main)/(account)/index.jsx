@@ -24,8 +24,12 @@ export default function Account() {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const router = useRouter();
   const { totalPoints, redeemedIds } = useProgress();
-  const { user, updateUser } = useUser();
+  const { user, updateUser, logout } = useUser();
   const [helpVisible, setHelpVisible] = useState(false);
+
+  if (!user) {
+    return null; // or a loading spinner, or redirect — see note below
+  }
 
   const fullName = `${user.firstName} ${user.lastName}`.trim();
   const initials =
@@ -150,7 +154,10 @@ export default function Account() {
               {
                 text: "Log out",
                 style: "destructive",
-                onPress: () => router.replace("/login"),
+                onPress: () => {
+                  logout();
+                  router.replace("/");
+                },
               },
             ])
           }

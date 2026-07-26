@@ -130,5 +130,3 @@ export async function sendChatMessage(
 
   return res.json();
 }
-
-export { API_BASE };

@@ -18,26 +18,34 @@ import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view
 import { loginSchema } from "../../schema/authSchema";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { useUser } from "../../context/UserContext";
 export default function Login() {
   const { theme, setTheme } = useContext(ThemeContext);
-  const [loggedUser, setLoggedUser] = useState({});
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const router = useRouter();
+  const { user, login } = useUser();
+  const [submitError, setSubmitError] = useState(null);
+
   const {
     control,
     handleSubmit,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(loginSchema),
+    mode: "onTouched",
     defaultValues: {
       email: "",
       password: "",
     },
   });
-  const onSubmit = (data) => {
-    setLoggedUser(data);
-    router.replace("/explore");
+  const onSubmit = async (data) => {
+    try {
+      await login(data);
+      router.replace("/explore");
+    } catch (err) {
+      setSubmitError(err.message);
+    }
   };
   return (
     <ThemedView style={styles.container}>
@@ -91,6 +99,7 @@ export default function Login() {
           <Text style={styles.errorText}>{errors.password.message}</Text>
         )}
         <Spacer height={12} />
+        {submitError && <Text style={styles.errorText}>{submitError}</Text>}
         <ThemedButton onPress={handleSubmit(onSubmit)}>
           <Text style={{ color: "#f2f2f2", textAlign: "center" }}>Log in</Text>
         </ThemedButton>

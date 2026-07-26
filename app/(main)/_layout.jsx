@@ -1,19 +1,26 @@
-import { View, StyleSheet } from "react-native";
-import { Stack, Tabs } from "expo-router";
+import { View, StyleSheet, ActivityIndicator } from "react-native";
+import { Redirect, Stack, Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useContext } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
 import { SettingsContext } from "../../context/SettingsContext";
-
+import { useUser } from "../../context/UserContext";
+import ThemedLoader from "../../components/ThemedLoader";
 export default function MainLayout() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const { missionAlerts, rewardAlerts } = useContext(SettingsContext);
 
   const insets = useSafeAreaInsets();
-
+  const { user, isLoading } = useUser();
+  if (isLoading) {
+    return <ThemedLoader />;
+  }
+  if (!user) {
+    return <Redirect href="/login" />;
+  }
   // Dynamic clean height calculation
   const tabHeight = 60 + (insets.bottom > 0 ? insets.bottom : 12);
 

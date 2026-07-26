@@ -19,7 +19,6 @@ import ThemedButton from "../../../components/ThemedButton";
 const FIELDS = [
   { key: "firstName", label: "First name" },
   { key: "lastName", label: "Last name" },
-  { key: "sex", label: "Sex" },
   { key: "country", label: "Country" },
   { key: "phone", label: "Phone", keyboardType: "phone-pad" },
   { key: "email", label: "Email", keyboardType: "email-address" },
@@ -106,6 +105,11 @@ export default function PersonalInfo() {
                   keyboardType={field.keyboardType}
                   placeholder={field.label}
                   placeholderTextColor={colorTheme.placeholder}
+                  editable={
+                    field.key === "phone" || field.key === "email"
+                      ? false
+                      : true
+                  }
                 />
               ) : (
                 <ThemedText style={styles.fieldValue}>
