@@ -42,7 +42,7 @@ export default function Login() {
   const onSubmit = async (data) => {
     try {
       await login(data);
-      router.replace("/step1");
+      router.replace("/explore");
     } catch (err) {
       setSubmitError(err.message);
     }
