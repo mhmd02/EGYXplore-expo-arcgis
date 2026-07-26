@@ -13,7 +13,10 @@ export const registerSchema = z
     firstName: z.string().min(1, "First name is required"),
     lastName: z.string().min(1, "Last name is required"),
     email: emailField,
-    password: z.string().min(9, "Password must be at least 9 characters"),
+    password: z
+      .string()
+      .min(12, "Password must be at least 12 characters")
+      .regex(/[a-z]/, "Password must contain a lowercase letter"),
     confirmPassword: z.string(),
     phone: z.string().min(11, "Phone number must be at least 11 digits"),
     country: z.string().min(3, "Nationality must be at least 3 characters"),

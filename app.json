@@ -43,7 +43,8 @@
         {
           "microphonePermission": "Allow Mock-Sdk-RN to access your microphone."
         }
-      ]
+      ],
+      "expo-secure-store"
     ]
   }
 }

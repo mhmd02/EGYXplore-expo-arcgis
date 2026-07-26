@@ -7,6 +7,7 @@ import { ProgressProvider } from "../context/ProgressContext";
 import { UserProvider } from "../context/UserContext";
 import SettingsProvider from "../context/SettingsContext";
 import UriProvider from "../context/UriContext";
+import ContentProvider from "../context/ContentContext";
 
 function MainLayout() {
   const context = useContext(ThemeContext);
@@ -45,7 +46,9 @@ export default function RootLayout() {
         <UserProvider>
           <SettingsProvider>
             <UriProvider>
-              <MainLayout />
+              <ContentProvider>
+                <MainLayout />
+              </ContentProvider>
             </UriProvider>
           </SettingsProvider>
         </UserProvider>

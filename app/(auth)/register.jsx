@@ -30,8 +30,8 @@ export default function Register() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  // Add-Input-to-Context using controlled elements
-  const { updateUser } = useUser();
+  const { updateUser, register } = useUser();
+  const [submitError, setSubmitError] = useState(null);
   const {
     profileImage,
     setProfileImage,
@@ -46,6 +46,7 @@ export default function Register() {
     formState: { errors },
   } = useForm({
     resolver: zodResolver(registerSchema),
+    mode: "onTouched",
     defaultValues: {
       firstName: "",
       lastName: "",
@@ -61,9 +62,14 @@ export default function Register() {
     ? profileImage.split("/").pop()
     : "Selected image";
 
-  const onSubmit = (data) => {
-    updateUser({ ...data, profileImage });
-    router.push("/step1");
+  const onSubmit = async (data) => {
+    try {
+      await register(data);
+      updateUser({ profileImage });
+      router.push("/step1");
+    } catch (err) {
+      setSubmitError(err.message);
+    }
   };
 
   return (
@@ -214,6 +220,9 @@ export default function Register() {
             />
           )}
         />
+        {errors.country && (
+          <Text style={styles.errorText}>{errors.country.message}</Text>
+        )}
         <View style={styles.imageUploadField}>
           <TouchableOpacity
             style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
@@ -261,6 +270,7 @@ export default function Register() {
         )}
         <Spacer height={12} />
         <View>
+          {submitError && <Text style={styles.errorText}>{submitError}</Text>}
           <ThemedButton onPress={handleSubmit(onSubmit)}>
             <Text style={{ color: "#f2f2f2", textAlign: "center" }}>
               Register
