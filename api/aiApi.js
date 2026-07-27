@@ -1,47 +1,23 @@
+import * as SecureStore from "expo-secure-store";
 import { File } from "expo-file-system";
 
-const TOKEN_KEY = "auth_token";
 let inMemoryToken = null;
-
-function getAsyncStorage() {
-  try {
-    return require("@react-native-async-storage/async-storage").default;
-  } catch {
-    return null;
-  }
-}
-
-async function saveToken(token) {
-  inMemoryToken = token;
-  const storage = getAsyncStorage();
-  if (storage) {
-    try {
-      await storage.setItem(TOKEN_KEY, token);
-    } catch {}
-  }
-}
 
 export async function getToken() {
   if (inMemoryToken) return inMemoryToken;
-  const storage = getAsyncStorage();
-  if (storage) {
-    try {
-      inMemoryToken = await storage.getItem(TOKEN_KEY);
-    } catch {
-      inMemoryToken = null;
-    }
+  try {
+    inMemoryToken = await SecureStore.getItemAsync("token");
+  } catch {
+    inMemoryToken = null;
   }
   return inMemoryToken;
 }
 
 export async function logout() {
   inMemoryToken = null;
-  const storage = getAsyncStorage();
-  if (storage) {
-    try {
-      await storage.removeItem(TOKEN_KEY);
-    } catch {}
-  }
+  try {
+    await SecureStore.deleteItemAsync("token");
+  } catch {}
 }
 
 export async function login(email, password) {
@@ -60,10 +36,12 @@ export async function login(email, password) {
   }
 
   const data = await res.json();
-  await saveToken(data.token);
+  inMemoryToken = data.token;
+  try {
+    await SecureStore.setItemAsync("token", data.token);
+  } catch {}
   return data;
 }
-
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "http://localhost:5217";
 
@@ -72,6 +50,7 @@ export async function sendChatMessage(
   history = [],
   images = [],
   audioUri = null,
+  chatSessionId = null,
 ) {
   const token = await getToken();
   const headers = {
@@ -82,6 +61,9 @@ export async function sendChatMessage(
   const formData = new FormData();
   formData.append("message", String(message || ""));
   formData.append("history", JSON.stringify(history));
+  if (chatSessionId) {
+    formData.append("chatSessionId", String(chatSessionId));
+  }
 
   // Collect base64 strings — avoids all Android Blob/ArrayBuffer/data-URL issues.
   const imagesBase64 = [];
@@ -110,7 +92,6 @@ export async function sendChatMessage(
     formData.append("audioMimeType", mimeType);
   }
 
-
   const res = await fetch(`${API_BASE}/AiChat/Send`, {
     method: "POST",
     headers,
@@ -128,5 +109,27 @@ export async function sendChatMessage(
     throw new Error(`[${res.status}] ${errorText || res.statusText}`);
   }
 
+  return res.json();
+}
+
+export async function getHistory() {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}/AiChat/GetHistory`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) return [];
+  return res.json();
+}
+
+export async function getHistorySession(id) {
+  const token = await getToken();
+  const res = await fetch(`${API_BASE}/AiChat/GetHistorySession?id=${id}`, {
+    headers: {
+      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    },
+  });
+  if (!res.ok) return null;
   return res.json();
 }
