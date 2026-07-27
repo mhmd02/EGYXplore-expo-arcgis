@@ -73,11 +73,22 @@ const highlightLineSymbol = {
   color: "#00f2ff59",
 };
 
+// This removes any characters that aren't letters, numbers, spaces, hyphens, or apostrophes.
+const sanitizeSearchTerm = (input) => {
+  if (!input) return "";
+  // Strip dangerous characters, then safely escape any remaining single quotes for SQL.
+  return input
+    .replace(/[^a-zA-Z0-9 \-']/g, "")
+    .replace(/'/g, "''"); 
+};
+
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchPoint, setSearchPoint] = useState(null);
   const searchRef = useRef();
   const mapViewRef = useRef(null);
@@ -167,6 +178,41 @@ export default function Explore() {
     };
   }, []);
 
+  // Fetch search suggestions as the user types
+  useEffect(() => {
+    const delayDebounceFn = setTimeout(async () => {
+      if (searchQuery.trim().length > 1 && showSuggestions) {
+        const term = sanitizeSearchTerm(searchQuery.trim().toLowerCase());
+        const whereClause = `LOWER(Name) LIKE '%${term}%'`;
+        
+        let localSuggestions = [];
+        try {
+          if (destLayerRef.current) {
+            const destRes = await destLayerRef.current.queryFeatures({ whereClause });
+            if (destRes) localSuggestions.push(...destRes.map(f => ({ name: f.attributes.Name, type: "landmark" })));
+          }
+          if (branchesLayerRef.current) {
+            const branchRes = await branchesLayerRef.current.queryFeatures({ whereClause });
+            if (branchRes) localSuggestions.push(...branchRes.map(f => ({ name: f.attributes.Name, type: "branch" })));
+          }
+          
+          // Remove duplicates based on name
+          const unique = Array.from(new Set(localSuggestions.map(a => a.name)))
+            .map(name => localSuggestions.find(a => a.name === name));
+          
+          setSuggestions(unique.slice(0, 5)); // limit to top 5 results
+        } catch (e) {
+          console.warn("Suggestion error:", e);
+        }
+      } else if (searchQuery.trim().length <= 1) {
+        setSuggestions([]);
+        if (showSuggestions) setShowSuggestions(false);
+      }
+    }, 300); // 300ms debounce to prevent spamming the database
+
+    return () => clearTimeout(delayDebounceFn);
+  }, [searchQuery, showSuggestions]);
+
   useEffect(() => {
     let subscriber = null;
     let isCancelled = false;
@@ -230,14 +276,17 @@ export default function Explore() {
     }
   };
 
-  const handleSearch = async () => {
+  const handleSearch = async (overrideQuery = null) => {
     Keyboard.dismiss(); // Hides the keyboard
-    if (!searchQuery.trim()) return;
+    const queryToUse = typeof overrideQuery === 'string' ? overrideQuery : searchQuery;
+    
+    if (!queryToUse.trim()) return;
     if (isSearching) return; // Guard against double-submits while a search is in flight
     setIsSearching(true);
+    setShowSuggestions(false); // Hide dropdown on search
 
     try {
-      const term = searchQuery.trim().toLowerCase();
+      const term = sanitizeSearchTerm(queryToUse.trim().toLowerCase());
       const whereClause = `LOWER(Name) LIKE '%${term}%'`;
 
       // 1. Search local Destinations first
@@ -296,7 +345,7 @@ export default function Explore() {
 
       // 3. Fallback to Global ArcGIS Geocoder
       // This sends "Cairo", for example, to the ArcGIS servers
-      const results = await geocoder.geocode(searchQuery);
+      const results = await geocoder.geocode(queryToUse);
       if (!results || results.length === 0) {
         Alert.alert(
           "No Results",
@@ -536,9 +585,15 @@ export default function Explore() {
               <ThemedTextInput
                 placeholder="Search"
                 value={searchQuery}
-                onChangeText={setSearchQuery}
+                onChangeText={(text) => {
+                  setSearchQuery(text);
+                  if (text.trim().length > 0) setShowSuggestions(true);
+                }}
+                onFocus={() => {
+                  if (searchQuery.trim().length > 0) setShowSuggestions(true);
+                }}
                 returnKeyType="search"
-                onSubmitEditing={handleSearch}
+                onSubmitEditing={() => handleSearch(searchQuery)}
                 style={[
                   styles.inputStyle,
                   { borderColor: colorTheme.border, borderWidth: 2 },
@@ -567,7 +622,7 @@ export default function Explore() {
                 ) : (
                   <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={handleSearch}
+                    onPress={() => handleSearch(searchQuery)}
                   >
                     <Ionicons name="search" size={20} color="#64748B" />
                   </TouchableOpacity>
@@ -575,7 +630,26 @@ export default function Explore() {
               </View>
             </View>
 
-            {/* Filter Pills */}
+            {/* Suggestions Dropdown OR Filter Pills */}
+            {showSuggestions && suggestions.length > 0 ? (
+              <View style={[styles.suggestionsDropdown, { backgroundColor: colorTheme.uiBackground, borderColor: colorTheme.border }]}>
+                {suggestions.map((item, index) => (
+                  <TouchableOpacity
+                    key={index}
+                    style={[styles.suggestionItem, index < suggestions.length - 1 && { borderBottomColor: colorTheme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
+                    onPress={() => {
+                      setSearchQuery(item.name);
+                      setShowSuggestions(false);
+                      handleSearch(item.name);
+                    }}
+                  >
+                    <Ionicons name="location-outline" size={20} color={colorTheme.title} style={{ marginRight: 10 }} />
+                    <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: colorTheme.text }}>{item.name}</Text>
+                    <Text style={{ fontSize: 12, opacity: 0.5, color: colorTheme.text }}>{item.type === 'landmark' ? 'Landmark' : 'Branch'}</Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            ) : (
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
@@ -619,6 +693,7 @@ export default function Explore() {
                 </Text>
               </TouchableOpacity>
             </ScrollView>
+            )}
           </View>
         </TouchableWithoutFeedback>
         {/* My Location Button - Floating at the bottom right */}
@@ -668,6 +743,23 @@ const styles = StyleSheet.create({
     paddingLeft: 16, // <-- Keep a nice space on the left side
     borderRadius: 50,
     paddingRight: 70, // Keep room for the clear/search icons on the right
+  },
+  suggestionsDropdown: {
+    marginTop: 8,
+    borderRadius: 16,
+    borderWidth: 1,
+    overflow: 'hidden',
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 5,
+  },
+  suggestionItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 12,
+    paddingHorizontal: 16,
   },
   filterContainer: {
     marginTop: 10,
