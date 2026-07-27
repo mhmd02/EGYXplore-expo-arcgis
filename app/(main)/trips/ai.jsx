@@ -12,6 +12,7 @@ import {
   Image,
   ScrollView,
 } from "react-native";
+import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { useContext, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -23,12 +24,24 @@ import {
   pickImageFromGalleryMultiple,
 } from "../../../constants/pickImages";
 import { useRecordAndUploadAudio } from "../../../constants/useRecordAndUploadAudio";
-import { sendChatMessage } from "../../../api/aiApi";
+import {
+  sendChatMessage,
+  getHistory,
+  getHistorySession,
+} from "../../../api/aiApi";
+import { useEffect } from "react";
 import ThemedText from "../../../components/ThemedText";
 import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedView from "../../../components/ThemedView";
 import CustomChoose from "../../../components/CustomChoose";
 import VoiceNotePlayer from "../../../components/Playback";
+
+// --- Module-Level Session Memory ---
+// These variables live in memory as long as the app is running.
+// If the user navigates away and the screen unmounts, the chat is preserved here.
+// When the app is fully closed, this memory is wiped clean.
+let activeSessionMessages = [];
+let activeSessionId = null;
 
 export default function Chat() {
   const { theme, setTheme } = useContext(ThemeContext);
@@ -40,14 +53,63 @@ export default function Chat() {
   const [text, setText] = useState("");
   const [audioUri, setAudioUri] = useState(null);
 
-  // The full conversation. Each item is { role: "user" | "assistant", content }.
-  const [messages, setMessages] = useState([]);
+  // Initialize state from our module-level memory
+  const [messages, setMessages] = useState(activeSessionMessages);
+  const [chatSessionId, setChatSessionId] = useState(activeSessionId);
   const [sending, setSending] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [historySessions, setHistorySessions] = useState([]);
   const listRef = useRef(null);
+
+  // Sync state changes back to the module-level memory so it survives unmounting
+  useEffect(() => {
+    activeSessionMessages = messages;
+    activeSessionId = chatSessionId;
+  }, [messages, chatSessionId]);
 
   const { isRecording, toggleRecording } = useRecordAndUploadAudio(
     handleRecordingComplete,
   );
+
+  useEffect(() => {
+    if (showHistory) {
+      loadHistoryList();
+    }
+  }, [showHistory]);
+
+  async function loadHistoryList() {
+    try {
+      const sessions = await getHistory();
+      if (sessions && sessions.length > 0) {
+        sessions.sort(
+          (a, b) => new Date(b.updatedDate || 0) - new Date(a.updatedDate || 0),
+        );
+        setHistorySessions(sessions);
+      }
+    } catch (e) {
+      console.warn("Could not load chat history list:", e);
+    }
+  }
+
+  async function loadSpecificSession(sessionId) {
+    try {
+      const sessionData = await getHistorySession(sessionId);
+      if (sessionData && sessionData.messages) {
+        setMessages(sessionData.messages);
+        setChatSessionId(sessionData.id);
+        setShowHistory(false);
+        setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
+      }
+    } catch (e) {
+      Alert.alert("Error", "Could not load this conversation.");
+    }
+  }
+
+  function startNewChat() {
+    setMessages([]);
+    setChatSessionId(null);
+    setShowHistory(false);
+  }
 
   const handleTakePhoto = async () => {
     const uri = await takePhoto();
@@ -111,8 +173,15 @@ export default function Chat() {
         history,
         currentImages,
         currentAudio,
+        chatSessionId,
       );
-      setMessages([...next, { role: "assistant", content: data.reply }]);
+      setMessages([
+        ...next,
+        { role: "assistant", content: data.reply, images: data.photoUrls },
+      ]);
+      if (data.chatSessionId) {
+        setChatSessionId(data.chatSessionId);
+      }
       if (data.tripSaved) {
         // A trip was created/updated — data.tripPlanId / data.tripPlanTitle
         // are available here to navigate to a details screen later.
@@ -156,13 +225,29 @@ export default function Chat() {
           {/* Render Attached Images */}
           {item.images && item.images.length > 0 && (
             <View style={styles.bubbleImagesGrid}>
-              {item.images.map((imgUri, idx) => (
-                <Image
-                  key={idx}
-                  source={{ uri: imgUri }}
-                  style={styles.bubbleImage}
-                />
-              ))}
+              {item.images.map((imgUri, idx) => {
+                const cleanUrl = imgUri.startsWith("//")
+                  ? imgUri.replace("//", "")
+                  : imgUri.replace("https://", "");
+                const proxiedUri = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
+
+                return (
+                  <TouchableOpacity
+                    key={idx}
+                    onPress={() => {
+                      import("react-native").then(({ Linking }) =>
+                        Linking.openURL(proxiedUri),
+                      );
+                    }}
+                  >
+                    <Image
+                      source={{ uri: proxiedUri }}
+                      style={[styles.bubbleImage]}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
+                );
+              })}
             </View>
           )}
 
@@ -185,171 +270,268 @@ export default function Chat() {
 
   return (
     <ThemedView style={[styles.container, { paddingBottom: tabBarPadding }]}>
-      <KeyboardAvoidingView
-        style={{ flex: 1 }}
-        behavior={Platform.OS === "ios" ? "padding" : "height"}
-        keyboardVerticalOffset={90}
-      >
-        {messages.length === 0 ? (
-          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-            <View style={styles.empty}>
-              <Ionicons
-                name="sparkles-outline"
-                size={40}
-                color={colorTheme.placeholder}
-              />
-              <ThemedText style={styles.emptyText}>
-                Ask me about Egyptian history, places, or to plan a trip.
-              </ThemedText>
-            </View>
-          </TouchableWithoutFeedback>
-        ) : (
-          <FlatList
-            ref={listRef}
-            data={messages}
-            keyExtractor={(_, i) => i.toString()}
-            renderItem={renderMessage}
-            contentContainerStyle={styles.list}
-            onContentSizeChange={() =>
-              listRef.current?.scrollToEnd({ animated: true })
-            }
-            keyboardShouldPersistTaps="handled"
-          />
-        )}
-
-        {sending && (
-          <View style={styles.thinkingRow}>
-            <ActivityIndicator size="small" color={colorTheme.text} />
-            <ThemedText style={styles.thinkingText}>Thinking…</ThemedText>
-          </View>
-        )}
-
-        {/* Modern AI Chat Input Bar */}
-        <View
-          style={[
-            styles.inputBoxContainer,
-            {
-              backgroundColor: colorTheme.uiBackground,
-              borderColor: colorTheme.border,
-            },
-          ]}
-        >
-          {/* 1. Image Previews nested top row */}
-          {(images.length > 0 || audioUri) && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.mediaPreviewList}
-            >
-              {audioUri && (
-                <View style={styles.audioBadge}>
-                  <Ionicons name="mic" size={16} color={Colors.primary} />
-                  <ThemedText style={styles.audioBadgeText}>
-                    Voice note
-                  </ThemedText>
-                  <TouchableOpacity onPress={() => setAudioUri(null)}>
-                    <Ionicons name="close-circle" size={18} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              )}
-              {images.map((uri, index) => (
-                <View key={index} style={styles.imagePreviewWrapper}>
-                  <Image source={{ uri: uri }} style={styles.previewImage} />
-                  <TouchableOpacity
-                    style={styles.removeImageBadge}
-                    onPress={() =>
-                      setImages((prev) => prev.filter((_, i) => i !== index))
-                    }
-                  >
-                    <Ionicons name="close-circle" size={20} color="#ef4444" />
-                  </TouchableOpacity>
-                </View>
-              ))}
-            </ScrollView>
-          )}
-
-          {/* 2. Text Input Area */}
-          <ThemedTextInput
-            placeholder="Ask..."
-            style={styles.askInput}
-            placeholderTextColor="#919ca9"
-            multiline={true}
-            value={text}
-            onChangeText={setText}
-          />
-
-          {/* 3. Bottom Action Bar */}
-          <View style={styles.inputActionsRow}>
-            {/* Left Action: Add Attachment */}
+      <Stack.Screen
+        options={{
+          headerRight: () => (
             <TouchableOpacity
-              style={styles.actionIconButton}
-              onPress={handleAddDocument}
+              onPress={() => setShowHistory(!showHistory)}
+              style={{ paddingRight: 10 }}
             >
               <Ionicons
-                name={alertVisible ? "close" : "add"}
-                size={24}
-                style={{ color: theme === "dark" ? "white" : "#6b7280" }}
+                name={showHistory ? "chatbubbles-outline" : "time-outline"}
+                size={26}
+                color={colorTheme.title}
               />
             </TouchableOpacity>
+          ),
+        }}
+      />
 
-            {/* Right Actions: Clear Text, Mic & Send Button */}
-            <View style={styles.rightActionsRow}>
-              {text.length > 0 && (
-                <TouchableOpacity
-                  style={styles.actionIconButton}
-                  onPress={() => setText("")}
+      {showHistory ? (
+        <View style={{ flex: 1, paddingTop: 10 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              justifyContent: "space-between",
+              alignItems: "center",
+              paddingHorizontal: 16,
+              paddingBottom: 16,
+              borderBottomWidth: 1,
+              borderColor: colorTheme.border,
+            }}
+          >
+            <ThemedText style={{ fontSize: 20, fontWeight: "bold" }}>
+              Chat History
+            </ThemedText>
+          </View>
+          <FlatList
+            data={historySessions}
+            keyExtractor={(item) => item.id.toString()}
+            contentContainerStyle={{ padding: 16, gap: 12 }}
+            ListEmptyComponent={
+              <ThemedText
+                style={{ opacity: 0.6, textAlign: "center", marginTop: 40 }}
+              >
+                No chat history found.
+              </ThemedText>
+            }
+            renderItem={({ item }) => (
+              <TouchableOpacity
+                style={{
+                  padding: 16,
+                  borderRadius: 12,
+                  backgroundColor: colorTheme.uiBackground,
+                  borderWidth: 1,
+                  borderColor: colorTheme.border,
+                }}
+                onPress={() => loadSpecificSession(item.id)}
+              >
+                <ThemedText style={{ fontSize: 16, fontWeight: "600" }}>
+                  {item.title || `Chat Session #${item.id}`}
+                </ThemedText>
+                <ThemedText
+                  style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}
                 >
-                  <Ionicons
-                    name="close-circle"
-                    size={20}
-                    style={{ color: theme === "dark" ? "#9ca3af" : "#919ca9" }}
-                  />
-                </TouchableOpacity>
-              )}
+                  {item.updatedDate
+                    ? new Date(item.updatedDate).toLocaleDateString()
+                    : "Previous Chat"}
+                </ThemedText>
+              </TouchableOpacity>
+            )}
+          />
+          <View
+            style={{
+              padding: 16,
+              borderTopWidth: 1,
+              borderColor: colorTheme.border,
+            }}
+          >
+            <TouchableOpacity
+              style={{
+                backgroundColor: Colors.primary,
+                padding: 16,
+                borderRadius: 12,
+                alignItems: "center",
+              }}
+              onPress={startNewChat}
+            >
+              <ThemedText
+                style={{ color: "white", fontWeight: "bold", fontSize: 16 }}
+              >
+                Start New Chat
+              </ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      ) : (
+        <KeyboardAvoidingView
+          style={{ flex: 1 }}
+          behavior={Platform.OS === "ios" ? "padding" : "height"}
+          keyboardVerticalOffset={90}
+        >
+          {messages.length === 0 ? (
+            <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+              <View style={styles.empty}>
+                <Ionicons
+                  name="sparkles-outline"
+                  size={40}
+                  color={colorTheme.placeholder}
+                />
+                <ThemedText style={styles.emptyText}>
+                  Ask me about Egyptian history, places, or to plan a trip.
+                </ThemedText>
+              </View>
+            </TouchableWithoutFeedback>
+          ) : (
+            <FlatList
+              ref={listRef}
+              data={messages}
+              keyExtractor={(_, i) => i.toString()}
+              renderItem={renderMessage}
+              contentContainerStyle={styles.list}
+              onContentSizeChange={() =>
+                listRef.current?.scrollToEnd({ animated: true })
+              }
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
 
+          {sending && (
+            <View style={styles.thinkingRow}>
+              <ActivityIndicator size="small" color={colorTheme.text} />
+              <ThemedText style={styles.thinkingText}>Thinking…</ThemedText>
+            </View>
+          )}
+
+          {/* Modern AI Chat Input Bar */}
+          <View
+            style={[
+              styles.inputBoxContainer,
+              {
+                backgroundColor: colorTheme.uiBackground,
+                borderColor: colorTheme.border,
+              },
+            ]}
+          >
+            {/* 1. Image Previews nested top row */}
+            {(images.length > 0 || audioUri) && (
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.mediaPreviewList}
+              >
+                {audioUri && (
+                  <View style={styles.audioBadge}>
+                    <Ionicons name="mic" size={16} color={Colors.primary} />
+                    <ThemedText style={styles.audioBadgeText}>
+                      Voice note
+                    </ThemedText>
+                    <TouchableOpacity onPress={() => setAudioUri(null)}>
+                      <Ionicons name="close-circle" size={18} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+                {images.map((uri, index) => (
+                  <View key={index} style={styles.imagePreviewWrapper}>
+                    <Image source={{ uri: uri }} style={styles.previewImage} />
+                    <TouchableOpacity
+                      style={styles.removeImageBadge}
+                      onPress={() =>
+                        setImages((prev) => prev.filter((_, i) => i !== index))
+                      }
+                    >
+                      <Ionicons name="close-circle" size={20} color="#ef4444" />
+                    </TouchableOpacity>
+                  </View>
+                ))}
+              </ScrollView>
+            )}
+
+            {/* 2. Text Input Area */}
+            <ThemedTextInput
+              placeholder="Ask..."
+              style={styles.askInput}
+              placeholderTextColor="#919ca9"
+              multiline={true}
+              value={text}
+              onChangeText={setText}
+            />
+
+            {/* 3. Bottom Action Bar */}
+            <View style={styles.inputActionsRow}>
+              {/* Left Action: Add Attachment */}
               <TouchableOpacity
                 style={styles.actionIconButton}
-                onPress={toggleRecording}
+                onPress={handleAddDocument}
               >
                 <Ionicons
-                  name="mic"
-                  size={22}
-                  style={{
-                    color: isRecording
-                      ? "#ef4444"
-                      : theme === "dark"
-                        ? "white"
-                        : "#6b7280",
-                  }}
+                  name={alertVisible ? "close" : "add"}
+                  size={24}
+                  style={{ color: theme === "dark" ? "white" : "#6b7280" }}
                 />
               </TouchableOpacity>
 
-              {(text.trim().length > 0 || images.length > 0 || audioUri) && (
+              {/* Right Actions: Clear Text, Mic & Send Button */}
+              <View style={styles.rightActionsRow}>
+                {text.length > 0 && (
+                  <TouchableOpacity
+                    style={styles.actionIconButton}
+                    onPress={() => setText("")}
+                  >
+                    <Ionicons
+                      name="close-circle"
+                      size={20}
+                      style={{
+                        color: theme === "dark" ? "#9ca3af" : "#919ca9",
+                      }}
+                    />
+                  </TouchableOpacity>
+                )}
+
                 <TouchableOpacity
-                  style={styles.sendButton}
-                  onPress={onSend}
-                  disabled={sending}
+                  style={styles.actionIconButton}
+                  onPress={toggleRecording}
                 >
                   <Ionicons
-                    name="arrow-up-circle"
-                    size={28}
-                    style={{ color: Colors.primary }}
+                    name="mic"
+                    size={22}
+                    style={{
+                      color: isRecording
+                        ? "#ef4444"
+                        : theme === "dark"
+                          ? "white"
+                          : "#6b7280",
+                    }}
                   />
                 </TouchableOpacity>
-              )}
-            </View>
-          </View>
 
-          <CustomChoose
-            visible={alertVisible}
-            onTakePhoto={handleTakePhoto}
-            onChooseGallery={handleChooseGallery}
-            colorTheme={colorTheme}
-            onClose={() => setAlertVisible(false)}
-            style={{ paddingTop: 420 }}
-          />
-        </View>
-      </KeyboardAvoidingView>
+                {(text.trim().length > 0 || images.length > 0 || audioUri) && (
+                  <TouchableOpacity
+                    style={styles.sendButton}
+                    onPress={onSend}
+                    disabled={sending}
+                  >
+                    <Ionicons
+                      name="arrow-up-circle"
+                      size={28}
+                      style={{ color: Colors.primary }}
+                    />
+                  </TouchableOpacity>
+                )}
+              </View>
+            </View>
+
+            <CustomChoose
+              visible={alertVisible}
+              onTakePhoto={handleTakePhoto}
+              onChooseGallery={handleChooseGallery}
+              colorTheme={colorTheme}
+              onClose={() => setAlertVisible(false)}
+              style={{ paddingTop: 420 }}
+            />
+          </View>
+        </KeyboardAvoidingView>
+      )}
     </ThemedView>
   );
 }
