@@ -1,10 +1,21 @@
 import * as ImagePicker from "expo-image-picker";
 import { Alert } from "react-native";
 
+const showAlert = (title, message) => {
+  // Defer slightly so the Activity has regained focus before showing the alert
+  // (avoids "Tried to show an alert while not attached to an Activity" on Android)
+  setTimeout(() => {
+    Alert.alert(title, message);
+  }, 100);
+};
+
 export const pickImageFromGalleryMultiple = async () => {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== "granted") {
-    Alert.alert("We need camera roll permissions to upload an avatar image.");
+    showAlert(
+      "Permission Denied",
+      "We need camera roll permissions to upload an avatar image.",
+    );
     return;
   }
 
@@ -23,7 +34,10 @@ export const pickImageFromGalleryMultiple = async () => {
 export const pickImageFromGallery = async () => {
   const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
   if (status !== "granted") {
-    Alert.alert("We need camera roll permissions to upload an avatar image.");
+    showAlert(
+      "Permission Denied",
+      "We need camera roll permissions to upload an avatar image.",
+    );
     return;
   }
 
@@ -42,9 +56,9 @@ export const pickImageFromGallery = async () => {
 export const takePhoto = async () => {
   const { status } = await ImagePicker.requestCameraPermissionsAsync();
   if (status !== "granted") {
-    Alert.alert(
-      "Permisson Denied",
-      "We need camera permissions to take a photo.",
+    showAlert(
+      "Permission Denied",
+      "We need camera roll permissions to upload an avatar image.",
     );
     return;
   }

@@ -2,11 +2,13 @@ import { useContext, useState } from "react";
 import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import ThemedView from "../../../components/ThemedView";
+import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import SuccessModal from "../../../components/SuccessModal";
 import { Colors } from "../../../constants/Colors";
 import { ThemeContext } from "../../../context/ThemeContext";
 import { getRewardById } from "../../../constants/rewards";
 import { useProgress } from "../../../context/ProgressContext";
+import { ContentContext } from "../../../context/ContentContext";
 
 export default function RewardConfirm() {
   const { id } = useLocalSearchParams();
@@ -14,10 +16,18 @@ export default function RewardConfirm() {
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] || Colors.light;
   const { totalPoints, isRedeemed, redeemReward } = useProgress();
-  const reward = getRewardById(id);
+  const { rewards, loading } = useContext(ContentContext);
+  const reward = rewards.find((r) => String(r.id) === String(id));
   const [done, setDone] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
 
+  if (loading) {
+    return (
+      <ThemedView safe={true} style={styles.container}>
+        <CustomThemedLoader />
+      </ThemedView>
+    );
+  }
   // Guard: opened without a valid reward id
   if (!reward) {
     return (
@@ -40,7 +50,7 @@ export default function RewardConfirm() {
   }
 
   const alreadyRedeemed = isRedeemed(reward.id);
-  const balanceAfter = totalPoints - reward.cost;
+  const balanceAfter = totalPoints - reward.points;
   const affordable = balanceAfter >= 0;
 
   const handleConfirm = () => {
@@ -68,23 +78,23 @@ export default function RewardConfirm() {
           <View style={styles.typeBadge}>
             <Text style={styles.typeBadgeText}>{reward.type}</Text>
           </View>
-          <Text style={styles.cost}>⭐ {reward.cost} pts</Text>
+          <Text style={styles.cost}>⭐ {reward.points} pts</Text>
         </View>
 
         {/* Reward name + sponsor */}
         <Text style={[styles.name, { color: colorTheme.title }]}>
-          {reward.name}
+          {reward.title}
         </Text>
-        {reward.sponsor && (
+        {/* {reward.sponsor && (
           <Text style={[styles.sponsor, { color: colorTheme.text }]}>
             by {reward.sponsor}
           </Text>
-        )}
+        )} */}
 
         {/* Description */}
-        {reward.description && (
+        {reward.desc && (
           <Text style={[styles.description, { color: colorTheme.text }]}>
-            {reward.description}
+            {reward.desc}
           </Text>
         )}
 
@@ -109,7 +119,7 @@ export default function RewardConfirm() {
             Reward cost
           </Text>
           <Text style={[styles.summaryValue, { color: Colors.warning }]}>
-            − {reward.cost}
+            − {reward.points}
           </Text>
         </View>
         <View

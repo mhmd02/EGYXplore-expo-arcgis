@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useMemo } from "react";
 import {
   Text,
   View,
@@ -13,9 +13,10 @@ import Card from "../../../components/Card";
 import FilterChips from "../../../components/FilterChips";
 import { Colors } from "../../../constants/Colors";
 import { ThemeContext } from "../../../context/ThemeContext";
-import { MISSION_TYPES, MISSIONS } from "../../../constants/missions";
 import { useProgress } from "../../../context/ProgressContext";
 import { useTabBarClearance } from "../../../constants/layout";
+import { ContentContext } from "../../../context/ContentContext";
+import CustomThemedLoader from "../../../components/CustomThemedLoader";
 
 export default function Missions() {
   const router = useRouter();
@@ -24,16 +25,53 @@ export default function Missions() {
   const { isCompleted } = useProgress();
   const [selectedType, setSelectedType] = useState("All");
   const tabBarClearance = useTabBarClearance();
-  
-  const visibleMissions = (
-    selectedType === "All"
-      ? [...MISSIONS]
-      : MISSIONS.filter((m) => m.type === selectedType)
-  ).sort((a, b) => {
-    // Completed missions sink to the bottom
-    return isCompleted(a.id) - isCompleted(b.id);
+  const { missions, loading, error } = useContext(ContentContext);
+
+  const missionTypes = useMemo(() => {
+    if (loading || !missions) return [];
+    const uniqueTypes = [...new Set(missions.map((m) => m.type))];
+    return uniqueTypes;
+  }, [missions, loading]);
+
+  const visibleMissions = useMemo(() => {
+    if (loading || !missions) return [];
+    return (
+      selectedType === "All"
+        ? [...missions]
+        : missions.filter((m) => m.type === selectedType)
+    ).sort((a, b) => {
+      // Completed missions sink to the bottom
+      return b.id - a.id;
+    });
   });
 
+  if (loading) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <CustomThemedLoader />
+        <ThemedText style={styles.statusText}>Loading missions...</ThemedText>
+      </ThemedView>
+    );
+  }
+  if (error) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <ThemedText style={styles.statusText}>
+          Something went wrong loading missions.
+        </ThemedText>
+        <Text style={styles.errorDetail}>{String(error)}</Text>
+      </ThemedView>
+    );
+  }
+  if (!missions || missions.length === 0) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <ThemedText style={styles.statusText}>
+          No missions available right now.
+        </ThemedText>
+      </ThemedView>
+    );
+  }
   return (
     <ThemedView safe={true} style={styles.container}>
       <ThemedText title={true} style={styles.header}>
@@ -41,7 +79,7 @@ export default function Missions() {
       </ThemedText>
       {/* Mission type filter chips */}
       <FilterChips
-        options={MISSION_TYPES}
+        options={["All", ...missionTypes]}
         selected={selectedType}
         onSelect={setSelectedType}
         style={styles.typeRow}
@@ -60,7 +98,7 @@ export default function Missions() {
             <Card key={mission.id} style={styles.card}>
               <View style={styles.cardInfo}>
                 <Text style={[styles.cardName, { color: colorTheme.title }]}>
-                  {mission.name}
+                  {mission.title}
                 </Text>
                 <Text style={styles.cardPoints}>⭐ {mission.points} pts</Text>
               </View>
@@ -89,19 +127,34 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
-    fontSize: 32, // Slightly larger for a nice header look
-    fontWeight: "800",
-    marginTop: 10, // Pushes it down from the top edge so it doesn't clip
-    marginBottom: 8,
-    paddingHorizontal: 16, // Aligns it with the start of the cards
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
   },
-  // Filter chips row (chip visuals live in FilterChips)
+  statusText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  errorDetail: {
+    fontSize: 13,
+    color: Colors.danger ?? "#DC2626",
+    marginTop: 6,
+    textAlign: "center",
+  },
+  header: {
+    fontSize: 32,
+    fontWeight: "800",
+    marginTop: 10,
+    marginBottom: 8,
+    paddingHorizontal: 16,
+  },
   typeRow: {
     marginTop: 16,
     marginBottom: 16,
   },
-  // Card list
   list: {
     flex: 1,
   },
@@ -126,7 +179,7 @@ const styles = StyleSheet.create({
   },
   cardPoints: {
     fontSize: 13,
-    color: Colors.accent, // warm "sun" gold — great for star/points
+    color: Colors.accent,
     fontWeight: "600",
   },
   goButton: {
@@ -145,7 +198,7 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     borderWidth: 1,
     borderColor: Colors.success,
-    backgroundColor: "rgba(16, 185, 129, 0.12)", // translucent success
+    backgroundColor: "rgba(16, 185, 129, 0.12)",
   },
   doneBadgeText: {
     color: Colors.success,

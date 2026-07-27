@@ -1,41 +1,75 @@
 import {
+  ImageBackground,
   Keyboard,
   StyleSheet,
   Text,
+  TouchableOpacity,
   TouchableWithoutFeedback,
   View,
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Link, useRouter } from "expo-router";
+import { Link, Redirect, useRouter } from "expo-router";
 
 import ThemedTextInput from "../components/ThemedTextInput";
 import ThemedView from "../components/ThemedView";
 import ThemedButton from "../components/ThemedButton";
 import ThemedLogo from "../components/Logo";
 import ThemedText from "../components/ThemedText";
+import CustomThemedLoader from "../components/CustomThemedLoader";
 import Spacer from "../components/Spacer";
 import { Colors } from "../constants/Colors";
+import { useUser } from "../context/UserContext";
 
 export default function App() {
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { token, user, isLoading } = useUser();
+
+  if (isLoading) {
+    return <CustomThemedLoader />;
+  }
+  if (user && token) return <Redirect href="/(main)/explore" />;
   return (
     <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-      <ThemedView style={[styles.container]}>
-        <ThemedText style={styles.logoText}>EGYXPLORE</ThemedText>
-        <Spacer />
-        <ThemedButton
-          style={styles.link}
-          onPress={() => router.push("/login")}
+      <ImageBackground
+        source={{
+          uri: "https://tse3.mm.bing.net/th/id/OIP.kmqAXRqJolR4do_OM1plJwHaHO?r=0&rs=1&pid=ImgDetMain&o=7&rm=3",
+        }}
+        style={styles.background}
+        resizeMode="cover"
+      >
+        <View
+          style={[
+            styles.container,
+            { paddingTop: insets.top, paddingBottom: insets.bottom },
+          ]}
         >
-          <Text style={{ textAlign: "center" }}>EXPLORE</Text>
-        </ThemedButton>
-      </ThemedView>
+          <ThemedText style={styles.logoText}>EGYXPLORE</ThemedText>
+          <View
+            style={[
+              styles.authContainer,
+              { paddingTop: insets.top, paddingBottom: insets.bottom },
+            ]}
+          >
+            <TouchableOpacity onPress={() => router.replace("/login")}>
+              <ThemedText style={styles.authText}>Sign in</ThemedText>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => router.replace("/register")}>
+              <ThemedText style={styles.authText}>Sign up</ThemedText>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ImageBackground>
     </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
+  background: {
+    flex: 1, // Ensures the background takes up the whole screen
+    width: "100%",
+    height: "100%",
+  },
   container: {
     flex: 1,
     alignItems: "center",
@@ -46,6 +80,22 @@ const styles = StyleSheet.create({
     width: "100%",
     alignItems: "center",
     zIndex: 1,
+  },
+  authText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#fff", // You might want white text if the background is dark
+    textShadowColor: "rgba(0, 0, 0, 0.75)", // Adds a shadow to text so it's readable over images
+    textShadowOffset: { width: -1, height: 1 },
+    textShadowRadius: 10,
+  },
+  authContainer: {
+    position: "absolute",
+    top: 20,
+    right: 20,
+    flexDirection: "row",
+    gap: 15,
+    zIndex: 10,
   },
   searchInput: {
     width: "80%",
@@ -73,9 +123,13 @@ const styles = StyleSheet.create({
   },
   logoText: {
     fontSize: 36,
-    fontWeight: "900", // Extra bold font weight
-    color: "#C19A6B", // Heritage Gold color
-    letterSpacing: 4, // Spreads out letters for a modern luxury brand look
-    textTransform: "uppercase", // Forces logo text to uppercase
+    fontWeight: "900",
+    color: Colors.accent,
+    letterSpacing: 4,
+    textTransform: "uppercase",
+    // Adding shadow to the logo as well to pop off the background
+    textShadowColor: "rgba(0, 0, 0, 0.8)",
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 10,
   },
 });

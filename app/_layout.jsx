@@ -42,8 +42,8 @@ function MainLayout() {
 export default function RootLayout() {
   return (
     <ThemeProvider>
-      <ProgressProvider>
-        <UserProvider>
+      <UserProvider>
+        <ProgressProvider>
           <SettingsProvider>
             <UriProvider>
               <ContentProvider>
@@ -51,8 +51,8 @@ export default function RootLayout() {
               </ContentProvider>
             </UriProvider>
           </SettingsProvider>
-        </UserProvider>
-      </ProgressProvider>
+        </ProgressProvider>
+      </UserProvider>
     </ThemeProvider>
   );
 }

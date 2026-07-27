@@ -11,7 +11,7 @@ export default function ContentProvider({ children }) {
   const { token, isLoading: userLoading } = useUser();
 
   const fetchData = async () => {
-    if (!userLoading) {
+    if (!token) {
       setMissions(null);
       setRewards(null);
       setLoading(false);
@@ -20,15 +20,29 @@ export default function ContentProvider({ children }) {
     setLoading(true);
     setError(null);
     try {
-      const [missionsData, rewardsData] = await Promise.all([
+      const [missionsResult, rewardsResult] = await Promise.allSettled([
         getMissions(token),
         getRewards(token),
       ]);
-      setMissions(missionsData);
-      setRewards(rewardsData);
-    } catch (err) {
-      console.error(err);
-      setError(err.message);
+      if (missionsResult.status === "fulfilled") {
+        setMissions(missionsResult.value);
+      } else {
+        console.log("Missions fetch failed:", missionsResult.reason);
+        setMissions(null);
+      }
+      if (rewardsResult.status === "fulfilled") {
+        setRewards(rewardsResult.value);
+      } else {
+        console.log("Missions fetch failed:", rewardsResult.reason);
+        setRewards(null);
+      }
+
+      if (
+        missionsResult.status === "rejected" &&
+        rewardsResult.status === "rejected"
+      ) {
+        setError("Failed to load content.");
+      }
     } finally {
       setLoading(false);
     }
