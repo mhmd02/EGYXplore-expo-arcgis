@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, Redirect } from "expo-router";
 import { useUser } from "../../context/UserContext";
 import CustomThemedLoader from "../../components/CustomThemedLoader";
 
@@ -7,7 +7,7 @@ export default function OnboardingLayout() {
   if (isLoading) {
     return <CustomThemedLoader />;
   }
-  if (user && token) return <Redirect href="/(main)/explore" />;
+  if (!user || !token) return <Redirect href="/login" />;
 
   return (
     <Stack
