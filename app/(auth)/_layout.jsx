@@ -16,7 +16,7 @@ export default function AuthLayout() {
   if (isLoading) {
     return <CustomThemedLoader />;
   }
-  if (user && token) return <Redirect href="/(main)/explore" />;
+  // We removed the aggressive user&&token redirect here so that register.jsx can push to onboarding instead of explore.
 
   return (
     <>

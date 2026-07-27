@@ -1,4 +1,4 @@
-import { Stack } from "expo-router";
+import { Stack, Redirect } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useContext } from "react";
 import ThemeProvider, { ThemeContext } from "../context/ThemeContext";

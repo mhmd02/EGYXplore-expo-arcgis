@@ -73,13 +73,10 @@ const highlightLineSymbol = {
   color: "#00f2ff59",
 };
 
-// This removes any characters that aren't letters, numbers, spaces, hyphens, or apostrophes.
 const sanitizeSearchTerm = (input) => {
   if (!input) return "";
-  // Strip dangerous characters, then safely escape any remaining single quotes for SQL.
-  return input
-    .replace(/[^a-zA-Z0-9 \-']/g, "")
-    .replace(/'/g, "''"); 
+  // Only escape single quotes for SQL. Do not strip other characters!
+  return input.replace(/'/g, "''"); 
 };
 
 export default function Explore() {
