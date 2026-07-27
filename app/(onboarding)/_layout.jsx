@@ -1,6 +1,14 @@
 import { Stack } from "expo-router";
+import { useUser } from "../../context/UserContext";
+import CustomThemedLoader from "../../components/CustomThemedLoader";
 
 export default function OnboardingLayout() {
+  const { token, user, isLoading } = useUser();
+  if (isLoading) {
+    return <CustomThemedLoader />;
+  }
+  if (user && token) return <Redirect href="/(main)/explore" />;
+
   return (
     <Stack
       screenOptions={{

@@ -3,11 +3,13 @@ import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import ThemedView from "../../../components/ThemedView";
+import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import SuccessModal from "../../../components/SuccessModal";
 import { Colors } from "../../../constants/Colors";
 import { ThemeContext } from "../../../context/ThemeContext";
-import { getMissionById } from "../../../constants/missions";
 import { useProgress } from "../../../context/ProgressContext";
+import { ContentContext } from "../../../context/ContentContext";
+import { takePhoto } from "../../../constants/pickImages";
 
 export default function MissionDetail() {
   // Which mission opened this page (passed from the missions list)
@@ -15,29 +17,43 @@ export default function MissionDetail() {
   const router = useRouter();
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] || Colors.light;
-  const mission = getMissionById(id);
+  const { missions, loading } = useContext(ContentContext);
+  const mission = missions.find((m) => String(m.id) === String(id));
   const { completeMission } = useProgress();
-  const [showHint, setShowHint] = useState(false);
+  const [images, setImages] = useState([]);
   const [submitted, setSubmitted] = useState(false);
-  // Which objectives are done, keyed by index: { 0: true, 2: true }
-  const [completed, setCompleted] = useState({});
+  const [completed, setCompleted] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
 
-  // Single choke-point for marking an objective done.
-  // Today it's called by a tap; a future auto-trigger (GPS / photo / quiz)
-  // can call setObjectiveDone(index, true) instead — the UI stays identical.
-  const setObjectiveDone = (index, done) => {
-    setCompleted((prev) => ({ ...prev, [index]: done }));
+  const handleSubmit = async () => {
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      await completeMission(mission.id);
+      setSubmitted(true);
+    } catch (err) {
+      console.error(err);
+      setSubmitError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
+  const handleTakePhoto = async () => {
+    const uri = await takePhoto();
+    if (uri) {
+      setImages((prevImages) => [...prevImages, uri]);
+      setCompleted(true);
+    }
   };
 
-  const toggleObjective = (index) => {
-    setObjectiveDone(index, !completed[index]);
-  };
-
-  // All objectives must be checked before the mission can be completed
-  const allDone =
-    mission?.objectives.length > 0 &&
-    mission.objectives.every((_, index) => completed[index]);
-
+  if (loading) {
+    return (
+      <ThemedView safe={true} style={styles.container}>
+        <CustomThemedLoader />
+      </ThemedView>
+    );
+  }
   // Guard: opened without a valid mission id
   if (!mission) {
     return (
@@ -71,7 +87,6 @@ export default function MissionDetail() {
             },
           ]}
         >
-          {/* Header: type badge + points */}
           <View style={styles.topRow}>
             <View style={styles.typeBadge}>
               <Text style={styles.typeBadgeText}>{mission.type}</Text>
@@ -79,92 +94,63 @@ export default function MissionDetail() {
             <Text style={styles.points}>⭐ {mission.points} pts</Text>
           </View>
 
-          {/* Mission name */}
           <Text style={[styles.name, { color: colorTheme.title }]}>
-            {mission.name}
+            {mission.title}
           </Text>
 
-          {/* Estimated time */}
           <View style={styles.metaRow}>
             <Text style={[styles.metaText, { color: colorTheme.text }]}>
-              ⏱ Est. {mission.estimatedTime}
+              {mission.desc}
             </Text>
           </View>
 
           <View
             style={[styles.divider, { backgroundColor: colorTheme.border }]}
           />
-
-          {/* Objectives */}
-          <Text style={[styles.sectionTitle, { color: colorTheme.title }]}>
-            Objectives
-          </Text>
-          {mission.objectives.map((objective, index) => {
-            const isDone = !!completed[index];
-            return (
-              <TouchableOpacity
-                key={index}
-                style={styles.objectiveRow}
-                onPress={() => toggleObjective(index)}
-                activeOpacity={0.7}
+          <View>
+            <TouchableOpacity
+              style={[styles.photoButton, completed && styles.photoButtonDone]}
+              onPress={handleTakePhoto}
+              activeOpacity={0.7}
+            >
+              <Ionicons
+                name={completed ? "checkmark-circle" : "camera-outline"}
+                size={18}
+                color={completed ? Colors.success : Colors.primary}
+              />
+              <Text
+                style={[
+                  styles.photoButtonText,
+                  completed && { color: Colors.success },
+                ]}
               >
-                <Ionicons
-                  name={isDone ? "checkmark-circle" : "ellipse-outline"}
-                  size={22}
-                  color={isDone ? Colors.primary : colorTheme.iconColor}
-                  style={styles.objectiveIcon}
-                />
-                <Text
-                  style={[
-                    styles.objectiveText,
-                    { color: colorTheme.text },
-                    isDone && styles.objectiveTextDone,
-                  ]}
-                >
-                  {objective}
-                </Text>
-              </TouchableOpacity>
-            );
-          })}
-
-          {/* Revealed hint */}
-          {showHint && (
-            <Text style={[styles.hintText, { color: colorTheme.text }]}>
-              💡 {mission.hint}
-            </Text>
-          )}
-
-          {/* Small translucent hint button */}
-          <TouchableOpacity
-            style={styles.hintButton}
-            onPress={() => setShowHint((prev) => !prev)}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.hintButtonText}>
-              {showHint ? "Hide Hint" : "Hint"}
-            </Text>
-          </TouchableOpacity>
-
-          <View
-            style={[styles.divider, { backgroundColor: colorTheme.border }]}
-          />
-
+                {completed ? "Photo Added" : "Take Photo"}
+              </Text>
+            </TouchableOpacity>
+          </View>
           <TouchableOpacity
             style={[
               styles.submitButton,
-              !allDone && { backgroundColor: colorTheme.border },
+              !completed && { backgroundColor: colorTheme.border },
             ]}
-            onPress={() => {
-              completeMission(mission); // award points (idempotent)
-              setSubmitted(true);
-            }}
-            disabled={!allDone}
+            onPress={handleSubmit}
+            disabled={!completed || submitting}
             activeOpacity={0.8}
           >
             <Text style={styles.submitButtonText}>
-              {allDone ? "Complete Mission" : "Finish all objectives"}
+              {submitting
+                ? "Saving..."
+                : completed
+                  ? "Complete Mission"
+                  : "Finish all objectives"}
             </Text>
           </TouchableOpacity>
+
+          {submitError && (
+            <Text style={[styles.errorDetail, { marginTop: 10 }]}>
+              {submitError}
+            </Text>
+          )}
         </View>
 
         {/* Success popup */}
@@ -342,5 +328,32 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: "700",
     marginTop: 14,
+  },
+  photoButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 2,
+    borderColor: Colors.primary,
+    backgroundColor: "transparent",
+    marginBottom: 16,
+  },
+  photoButtonDone: {
+    borderColor: Colors.success,
+    backgroundColor: "rgba(34, 197, 94, 0.1)", // Light translucent green
+  },
+  photoButtonText: {
+    fontSize: 16,
+    fontWeight: "700",
+    color: Colors.primary,
+    marginLeft: 8, // Space between the Ionicons and the text
+  },
+  errorDetail: {
+    fontSize: 13,
+    color: Colors.danger ?? "#DC2626",
+    marginTop: 6,
+    textAlign: "center",
   },
 });

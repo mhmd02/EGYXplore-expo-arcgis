@@ -663,8 +663,11 @@ const styles = StyleSheet.create({
   },
   inputStyle: {
     flex: 1,
+    height: 44, // <-- Force a compact, minimized height (40-44 is ideal for touch targets)
+    paddingVertical: 0, // <-- Remove default vertical padding so text centers naturally
+    paddingLeft: 16, // <-- Keep a nice space on the left side
     borderRadius: 50,
-    paddingRight: 70,
+    paddingRight: 70, // Keep room for the clear/search icons on the right
   },
   filterContainer: {
     marginTop: 10,

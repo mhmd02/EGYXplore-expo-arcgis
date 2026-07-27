@@ -1,4 +1,4 @@
-import { useContext, useState } from "react";
+import { useContext, useState, useMemo } from "react";
 import {
   Text,
   View,
@@ -13,9 +13,10 @@ import FilterChips from "../../../components/FilterChips";
 import { useRouter } from "expo-router";
 import { Colors } from "../../../constants/Colors";
 import { ThemeContext } from "../../../context/ThemeContext";
-import { REWARD_TYPES, REWARDS } from "../../../constants/rewards";
 import { useProgress } from "../../../context/ProgressContext";
 import { useTabBarClearance } from "../../../constants/layout";
+import { ContentContext } from "../../../context/ContentContext";
+import CustomThemedLoader from "../../../components/CustomThemedLoader";
 
 export default function Rewards() {
   const { theme } = useContext(ThemeContext);
@@ -24,16 +25,53 @@ export default function Rewards() {
   const { totalPoints, isRedeemed } = useProgress();
   const [selectedType, setSelectedType] = useState("All");
   const tabBarClearance = useTabBarClearance();
+  const { rewards, loading, error } = useContext(ContentContext);
 
-  const visibleRewards = (
-    selectedType === "All"
-      ? [...REWARDS]
-      : REWARDS.filter((r) => r.type === selectedType)
-  ).sort((a, b) => {
-    // Redeemed rewards float to the top
-    return isRedeemed(b.id) - isRedeemed(a.id);
+  const rewardTypes = useMemo(() => {
+    if (loading || !rewards) return [];
+    const uniqueTypes = [...new Set(rewards.map((r) => r.type))];
+    return uniqueTypes;
+  }, [rewards, loading]);
+
+  const visibleRewards = useMemo(() => {
+    if (loading || !rewards) return [];
+    return (
+      selectedType === "All"
+        ? [...rewards]
+        : rewards.filter((r) => r.type === selectedType)
+    ).sort((a, b) => {
+      // Redeemed rewards float to the top
+      return isRedeemed(b.id) - isRedeemed(a.id);
+    });
   });
 
+  if (loading) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <CustomThemedLoader />
+        <ThemedText style={styles.statusText}>Loading missions...</ThemedText>
+      </ThemedView>
+    );
+  }
+  if (error) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <ThemedText style={styles.statusText}>
+          Something went wrong loading rewards.
+        </ThemedText>
+        <Text style={styles.errorDetail}>{String(error)}</Text>
+      </ThemedView>
+    );
+  }
+  if (!rewards || rewards.length === 0) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <ThemedText style={styles.statusText}>
+          No rewards available right now.
+        </ThemedText>
+      </ThemedView>
+    );
+  }
   return (
     <ThemedView safe={true} style={styles.container}>
       <ThemedText title={true} style={styles.header}>
@@ -41,7 +79,7 @@ export default function Rewards() {
       </ThemedText>
       <View style={styles.topRow}>
         <FilterChips
-          options={REWARD_TYPES}
+          options={["All", ...rewardTypes]}
           selected={selectedType}
           onSelect={setSelectedType}
           style={styles.typeRow}
@@ -72,21 +110,21 @@ export default function Rewards() {
       >
         {visibleRewards.map((reward) => {
           const redeemed = isRedeemed(reward.id);
-          const affordable = totalPoints >= reward.cost;
+          const affordable = totalPoints >= reward.points;
           return (
             <Card key={reward.id} style={styles.card}>
               <View style={styles.cardInfo}>
                 <Text style={[styles.cardName, { color: colorTheme.title }]}>
-                  {reward.name}
+                  {reward.title}
                 </Text>
-                {reward.sponsor && (
+                {reward.desc && (
                   <Text
                     style={[styles.cardSponsor, { color: colorTheme.text }]}
                   >
-                    by {reward.sponsor}
+                    {reward.desc}
                   </Text>
                 )}
-                <Text style={styles.cardCost}>⭐ {reward.cost} pts</Text>
+                <Text style={styles.cardCost}>⭐ {reward.points} pts</Text>
               </View>
 
               {redeemed ? (
@@ -118,6 +156,23 @@ export default function Rewards() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  errorDetail: {
+    fontSize: 13,
+    color: Colors.danger ?? "#DC2626",
+    marginTop: 6,
+    textAlign: "center",
   },
   header: {
     fontSize: 32, // Slightly larger for a nice header look

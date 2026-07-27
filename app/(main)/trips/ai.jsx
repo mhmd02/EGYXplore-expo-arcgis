@@ -29,6 +29,7 @@ import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedView from "../../../components/ThemedView";
 import CustomChoose from "../../../components/CustomChoose";
 import VoiceNotePlayer from "../../../components/Playback";
+
 export default function Chat() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
