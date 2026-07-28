@@ -57,7 +57,13 @@ export default function ContentProvider({ children }) {
 
   return (
     <ContentContext.Provider
-      value={{ missions, rewards, loading, error, refetch: fetchData }}
+      value={{
+        missions,
+        rewards,
+        loading,
+        error,
+        refetch: fetchData,
+      }}
     >
       {children}
     </ContentContext.Provider>

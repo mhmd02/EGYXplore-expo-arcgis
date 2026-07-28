@@ -17,15 +17,18 @@ import { useProgress } from "../../../context/ProgressContext";
 import { useTabBarClearance } from "../../../constants/layout";
 import { ContentContext } from "../../../context/ContentContext";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
+import { Ionicons } from "@expo/vector-icons";
 
 export default function Missions() {
   const router = useRouter();
   const { theme } = useContext(ThemeContext);
-  const colorTheme = Colors[theme] || Colors.light;
-  const { isCompleted } = useProgress();
   const [selectedType, setSelectedType] = useState("All");
-  const tabBarClearance = useTabBarClearance();
+  const { isCompleted, completedIds } = useProgress();
   const { missions, loading, error } = useContext(ContentContext);
+  const colorTheme = Colors[theme] || Colors.light;
+  const tabBarClearance = useTabBarClearance();
+
+  const completedCount = completedIds?.length ?? 0;
 
   const missionTypes = useMemo(() => {
     if (loading || !missions) return [];
@@ -39,11 +42,8 @@ export default function Missions() {
       selectedType === "All"
         ? [...missions]
         : missions.filter((m) => m.type === selectedType)
-    ).sort((a, b) => {
-      // Completed missions sink to the bottom
-      return b.id - a.id;
-    });
-  });
+    ).sort((a, b) => isCompleted(a.id) - isCompleted(b.id)); // completed sink to bottom, as the comment says
+  }, [loading, missions, selectedType, isCompleted]);
 
   if (loading) {
     return (
@@ -74,9 +74,21 @@ export default function Missions() {
   }
   return (
     <ThemedView safe={true} style={styles.container}>
-      <ThemedText title={true} style={styles.header}>
-        Missions
-      </ThemedText>
+      <ThemedView style={styles.missionHeader}>
+        <ThemedText title={true} style={styles.header}>
+          Missions
+        </ThemedText>
+        <View style={styles.trophy}>
+          <Ionicons name="trophy" size={24} color={colorTheme.title} />
+        </View>
+        {completedCount > 0 && (
+          <View style={styles.trophyBadge}>
+            <Text style={styles.trophyBadgeText}>
+              {completedCount > 99 ? "99+" : completedCount}
+            </Text>
+          </View>
+        )}
+      </ThemedView>
       {/* Mission type filter chips */}
       <FilterChips
         options={["All", ...missionTypes]}
@@ -127,6 +139,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
+  missionHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 10,
+  },
   centered: {
     justifyContent: "center",
     alignItems: "center",
@@ -149,6 +167,10 @@ const styles = StyleSheet.create({
     fontWeight: "800",
     marginTop: 10,
     marginBottom: 8,
+    paddingHorizontal: 16,
+  },
+  trophy: {
+    padding: 4,
     paddingHorizontal: 16,
   },
   typeRow: {
@@ -202,6 +224,28 @@ const styles = StyleSheet.create({
   },
   doneBadgeText: {
     color: Colors.success,
+    fontWeight: "700",
+  },
+  trophy: {
+    padding: 4,
+    paddingHorizontal: 16,
+    position: "relative",
+  },
+  trophyBadge: {
+    position: "absolute",
+    top: 0,
+    right: 8,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 3,
+    backgroundColor: Colors.accent,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  trophyBadgeText: {
+    color: "#fff",
+    fontSize: 10,
     fontWeight: "700",
   },
 });

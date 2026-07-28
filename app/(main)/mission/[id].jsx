@@ -17,11 +17,12 @@ export default function MissionDetail() {
   const router = useRouter();
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] || Colors.light;
-  const { missions, loading } = useContext(ContentContext);
+  const { missions, setMissions, loading } = useContext(ContentContext);
   const mission = missions.find((m) => String(m.id) === String(id));
   const { completeMission } = useProgress();
   const [images, setImages] = useState([]);
   const [submitted, setSubmitted] = useState(false);
+  const [saved, setSaved] = useState(false);
   const [completed, setCompleted] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
@@ -107,44 +108,55 @@ export default function MissionDetail() {
           <View
             style={[styles.divider, { backgroundColor: colorTheme.border }]}
           />
-          <View>
-            <TouchableOpacity
-              style={[styles.photoButton, completed && styles.photoButtonDone]}
-              onPress={handleTakePhoto}
-              activeOpacity={0.7}
-            >
-              <Ionicons
-                name={completed ? "checkmark-circle" : "camera-outline"}
-                size={18}
-                color={completed ? Colors.success : Colors.primary}
-              />
-              <Text
+          {!saved && (
+            <View>
+              <TouchableOpacity
                 style={[
-                  styles.photoButtonText,
-                  completed && { color: Colors.success },
+                  styles.photoButton,
+                  completed && styles.photoButtonDone,
                 ]}
+                onPress={handleTakePhoto}
+                activeOpacity={0.7}
               >
-                {completed ? "Photo Added" : "Take Photo"}
+                <Ionicons
+                  name={completed ? "checkmark-circle" : "camera-outline"}
+                  size={18}
+                  color={completed ? Colors.success : Colors.primary}
+                  disabled={submitted}
+                />
+                <Text
+                  style={[
+                    styles.photoButtonText,
+                    completed && { color: Colors.success },
+                  ]}
+                >
+                  {completed ? "Photo Added" : "Take Photo"}
+                </Text>
+              </TouchableOpacity>
+            </View>
+          )}
+          {!saved && (
+            <TouchableOpacity
+              style={[
+                styles.submitButton,
+                !completed && { backgroundColor: colorTheme.border },
+              ]}
+              onPress={() => {
+                handleSubmit();
+                setSaved((prev) => !prev);
+              }}
+              disabled={!completed || submitting}
+              activeOpacity={0.8}
+            >
+              <Text style={styles.submitButtonText}>
+                {submitting
+                  ? "Saving..."
+                  : completed
+                    ? "Complete Mission"
+                    : "Finish all objectives"}
               </Text>
             </TouchableOpacity>
-          </View>
-          <TouchableOpacity
-            style={[
-              styles.submitButton,
-              !completed && { backgroundColor: colorTheme.border },
-            ]}
-            onPress={handleSubmit}
-            disabled={!completed || submitting}
-            activeOpacity={0.8}
-          >
-            <Text style={styles.submitButtonText}>
-              {submitting
-                ? "Saving..."
-                : completed
-                  ? "Complete Mission"
-                  : "Finish all objectives"}
-            </Text>
-          </TouchableOpacity>
+          )}
 
           {submitError && (
             <Text style={[styles.errorDetail, { marginTop: 10 }]}>
@@ -168,7 +180,6 @@ export default function MissionDetail() {
             activeOpacity={0.8}
             onPress={() => {
               setSubmitted(false);
-              // Redirect back to the missions list
               router.replace("/mission");
             }}
           >
