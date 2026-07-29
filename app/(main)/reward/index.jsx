@@ -19,13 +19,27 @@ import { ContentContext } from "../../../context/ContentContext";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
 
 export default function Rewards() {
-  const { theme } = useContext(ThemeContext);
-  const colorTheme = Colors[theme] || Colors.light;
-  const router = useRouter();
-  const { totalPoints, isRedeemed } = useProgress();
   const [selectedType, setSelectedType] = useState("All");
+  const router = useRouter();
+  const { theme } = useContext(ThemeContext);
+  const {
+    rewards,
+    loading: rewardsLoading,
+    error: rewardsError,
+  } = useContext(ContentContext);
+  const {
+    totalPoints,
+    isRedeemed,
+    redeemedIds,
+    redeemReward,
+    error: progressError,
+    loading: progressLoading,
+  } = useProgress();
+  const error = rewardsError || progressError;
+  const loading = rewardsLoading || progressLoading;
+
   const tabBarClearance = useTabBarClearance();
-  const { rewards, loading, error } = useContext(ContentContext);
+  const colorTheme = Colors[theme] || Colors.light;
 
   const rewardTypes = useMemo(() => {
     if (loading || !rewards) return [];
@@ -40,16 +54,15 @@ export default function Rewards() {
         ? [...rewards]
         : rewards.filter((r) => r.type === selectedType)
     ).sort((a, b) => {
-      // Redeemed rewards float to the top
       return isRedeemed(b.id) - isRedeemed(a.id);
     });
-  });
+  }, [rewards, loading, selectedType, redeemedIds]);
 
   if (loading) {
     return (
       <ThemedView safe={true} style={[styles.container, styles.centered]}>
         <CustomThemedLoader />
-        <ThemedText style={styles.statusText}>Loading missions...</ThemedText>
+        <ThemedText style={styles.statusText}>Loading rewards...</ThemedText>
       </ThemedView>
     );
   }
@@ -74,17 +87,10 @@ export default function Rewards() {
   }
   return (
     <ThemedView safe={true} style={styles.container}>
-      <ThemedText title={true} style={styles.header}>
-        Rewards
-      </ThemedText>
-      <View style={styles.topRow}>
-        <FilterChips
-          options={["All", ...rewardTypes]}
-          selected={selectedType}
-          onSelect={setSelectedType}
-          style={styles.typeRow}
-          contentContainerStyle={{ paddingLeft: 16 }}
-        />
+      <View style={styles.headerRow}>
+        <ThemedText title={true} style={styles.header}>
+          Rewards
+        </ThemedText>
 
         <View
           style={[
@@ -92,15 +98,24 @@ export default function Rewards() {
             {
               backgroundColor: colorTheme.uiBackground,
               borderColor: Colors.accent,
+              shadowColor: Colors.accent, // A subtle colored shadow for aesthetics
             },
           ]}
         >
-          <Text style={styles.balanceValue}>⭐ {totalPoints}</Text>
+          <Text style={styles.balanceValue}>{totalPoints}</Text>
           <Text style={[styles.balancePts, { color: colorTheme.text }]}>
-            pts
+            PTS
           </Text>
         </View>
       </View>
+
+      <FilterChips
+        options={["All", ...rewardTypes]}
+        selected={selectedType}
+        onSelect={setSelectedType}
+        style={styles.typeRow}
+        contentContainerStyle={{ paddingLeft: 16 }}
+      />
 
       {/* Reward cards */}
       <ScrollView
@@ -174,48 +189,49 @@ const styles = StyleSheet.create({
     marginTop: 6,
     textAlign: "center",
   },
+  headerRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+  },
   header: {
     fontSize: 32, // Slightly larger for a nice header look
     fontWeight: "800",
     marginTop: 10, // Pushes it down from the top edge so it doesn't clip
     marginBottom: 8, // Pushes it down from the top edge so it doesn't clip
-    paddingHorizontal: 16, // Aligns it with the start of the cards
   },
   // Points balance header
   // Circular points badge (right of the filter row)
   balanceCircle: {
-    width: 72,
-    height: 72,
-    borderRadius: 36,
+    width: 64, // Scaled down slightly for better proportions
+    height: 64,
+    borderRadius: 32,
     borderWidth: 2,
     alignItems: "center",
     justifyContent: "center",
-    // Soft lift
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 6,
-    elevation: 4,
-  },
-  balancePts: {
-    fontSize: 11,
-    fontWeight: "600",
+    // Lift and glow
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 6,
   },
   balanceValue: {
-    fontSize: 16,
-    fontWeight: "800",
-    color: Colors.accent, // warm "sun" gold for points
+    fontSize: 18,
+    fontWeight: "900",
+    color: Colors.accent,
+    lineHeight: 22,
   },
-  // Filter chips + badge on one row
-  topRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 16,
-    marginRight: 16,
+  balancePts: {
+    fontSize: 10,
+    fontWeight: "700",
+    textTransform: "uppercase",
+    opacity: 0.7,
   },
   // Type filter chips share (chip visuals live in FilterChips)
   typeRow: {
-    marginRight: 12,
+    marginTop: 16,
+    marginBottom: 16,
   },
   // Card list
   list: {

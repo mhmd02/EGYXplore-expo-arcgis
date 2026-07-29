@@ -6,7 +6,13 @@ import {
   useEffect,
 } from "react";
 import { useUser } from "./UserContext";
-import { API_BASE_URL } from "../api/api";
+import {
+  completeMissionApi,
+  getMyCompletedMissions,
+  getMyBalance,
+  redeemRewardApi,
+  getMyRedeemedRewards,
+} from "../api/progressApi";
 
 const ProgressContext = createContext(null);
 
@@ -16,100 +22,70 @@ export function ProgressProvider({ children }) {
   const [totalPoints, setTotalPoints] = useState(0);
   const [redeemedIds, setRedeemedIds] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
 
   const isCompleted = (id) => completedIds.includes(id);
 
   const fetchCompleted = useCallback(async () => {
     if (!token) {
       setCompletedIds([]);
-      setLoading(false);
       return;
     }
-    setLoading(true);
-    try {
-      const response = await fetch(
-        `${API_BASE_URL}/MobileMission/MyCompleted`,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        },
-      );
-      if (!response.ok) {
-        throw new Error(
-          `Failed to fetch completed missions: ${response.status}`,
-        );
-      }
-      const data = await response.json();
-      setCompletedIds(data);
-    } catch (err) {
-      console.log(err);
-    } finally {
-      setLoading(false);
-    }
+    const data = await getMyCompletedMissions(token);
+    setCompletedIds(data);
   }, [token]);
 
   const fetchBalance = useCallback(async () => {
     if (!token) {
-      setTotalPoints(null);
+      setTotalPoints(0);
       return;
     }
-    try {
-      const response = await fetch(`${API_BASE_URL}/MobileMission/MyBalance`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-      if (!response.ok) {
-        throw new Error(`Failed to fetch Your balance: ${response.status}`);
-      }
-      const data = await response.json();
-      setTotalPoints(data.totalBalance);
-    } catch (err) {
-      console.log(err);
+    const data = await getMyBalance(token);
+    setTotalPoints(data.totalBalance);
+  }, [token]);
+
+  const fetchRedeemed = useCallback(async () => {
+    if (!token) {
+      setRedeemedIds([]);
+      return;
     }
+    const data = await getMyRedeemedRewards(token);
+    setRedeemedIds(data);
   }, [token]);
 
   useEffect(() => {
     if (userLoading) return;
-    fetchCompleted();
-    fetchBalance();
-  }, [token, userLoading, fetchCompleted, fetchBalance]);
-  // Single award choke-point. Idempotent: a mission can only pay out once.
+    if (!token) {
+      setCompletedIds([]);
+      setTotalPoints(0);
+      setLoading(false);
+      return;
+    }
+    setLoading(true);
+    setError(null);
+    Promise.all([fetchCompleted(), fetchBalance(), fetchRedeemed()])
+      .catch((err) => {
+        console.log(err);
+        setError(err.message || "Failed to load your progress.");
+      })
+      .finally(() => setLoading(false));
+  }, [token, userLoading, fetchCompleted, fetchBalance, fetchRedeemed]);
 
   const completeMission = async (missionId) => {
-    const response = await fetch(`${API_BASE_URL}/MobileMission/Complete`, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${token}`,
-      },
-      body: JSON.stringify({ missionId }),
-    });
-    if (!response.ok) {
-      const errorBody = await response.json().catch(() => ({}));
-      throw new Error(
-        errorBody.message || `Failed to complete mission: ${response.status}`,
-      );
-    }
-    const result = await response.json();
+    const result = await completeMissionApi(token, missionId);
     setCompletedIds((prev) => [...prev, missionId]);
     setTotalPoints((prev) => prev + (result.pointsEarned ?? 0));
     return result;
   };
 
-  const isRedeemed = (id) => redeemedIds.includes(id);
-
-  // Single spend choke-point. Guards: enough points + not already redeemed.
-  // Returns true on success, false if it couldn't be redeemed.
-  const redeemReward = (reward) => {
-    if (!reward || redeemedIds.includes(reward.id)) return false;
-    if (totalPoints < reward.points) return false;
-
-    setRedeemedIds((prev) => [...prev, reward.id]);
-    setTotalPoints((prev) => prev - reward.points);
-    return true;
+  const redeemReward = async (rewardId) => {
+    const result = await redeemRewardApi(token, rewardId);
+    setRedeemedIds((prev) => [...prev, rewardId]);
+    setTotalPoints(result.remainingPoints);
+    return result;
   };
+
+  const isRedeemed = (id) => redeemedIds.includes(id);
 
   return (
     <ProgressContext.Provider
@@ -122,6 +98,7 @@ export function ProgressProvider({ children }) {
         isRedeemed,
         redeemReward,
         loading,
+        error,
       }}
     >
       {children}

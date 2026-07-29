@@ -6,7 +6,6 @@ import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import SuccessModal from "../../../components/SuccessModal";
 import { Colors } from "../../../constants/Colors";
 import { ThemeContext } from "../../../context/ThemeContext";
-import { getRewardById } from "../../../constants/rewards";
 import { useProgress } from "../../../context/ProgressContext";
 import { ContentContext } from "../../../context/ContentContext";
 
@@ -20,6 +19,24 @@ export default function RewardConfirm() {
   const reward = rewards.find((r) => String(r.id) === String(id));
   const [done, setDone] = useState(false);
   const [voucherCode, setVoucherCode] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [submitError, setSubmitError] = useState(null);
+
+  const handleConfirm = async () => {
+    if (!reward) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      const result = await redeemReward(reward.id);
+      setVoucherCode(result.code);
+      setDone(true);
+    } catch (err) {
+      console.error(err);
+      setSubmitError(err.message || "Something went wrong. Please try again.");
+    } finally {
+      setSubmitting(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -50,17 +67,8 @@ export default function RewardConfirm() {
   }
 
   const alreadyRedeemed = isRedeemed(reward.id);
-  const balanceAfter = totalPoints - reward.points;
-  const affordable = balanceAfter >= 0;
-
-  const handleConfirm = () => {
-    if (redeemReward(reward)) {
-      // Generate a local voucher code (mock — a real backend would issue this)
-      const rand = Math.random().toString(36).slice(2, 8).toUpperCase();
-      setVoucherCode(`EGX-${reward.id}-${rand}`);
-      setDone(true);
-    }
-  };
+  const affordable = totalPoints >= reward.points;
+  const balanceAfter = affordable ? totalPoints - reward.points : totalPoints;
 
   return (
     <ThemedView safe={true} style={styles.container}>
@@ -85,11 +93,6 @@ export default function RewardConfirm() {
         <Text style={[styles.name, { color: colorTheme.title }]}>
           {reward.title}
         </Text>
-        {/* {reward.sponsor && (
-          <Text style={[styles.sponsor, { color: colorTheme.text }]}>
-            by {reward.sponsor}
-          </Text>
-        )} */}
 
         {/* Description */}
         {reward.desc && (
@@ -167,10 +170,18 @@ export default function RewardConfirm() {
           <TouchableOpacity
             style={styles.confirmButton}
             onPress={handleConfirm}
+            disabled={submitting}
             activeOpacity={0.8}
           >
-            <Text style={styles.confirmButtonText}>Confirm Redemption</Text>
+            <Text style={styles.confirmButtonText}>
+              {submitting ? "Redeeming..." : "Confirm Redemption"}
+            </Text>
           </TouchableOpacity>
+        )}
+        {submitError && (
+          <Text style={[styles.errorDetail, { marginTop: 10 }]}>
+            {submitError}
+          </Text>
         )}
       </View>
 
@@ -181,7 +192,7 @@ export default function RewardConfirm() {
         title="Reward Redeemed!"
       >
         <Text style={[styles.successSub, { color: colorTheme.text }]}>
-          {reward.name}
+          {reward.title}
         </Text>
 
         {/* Voucher card with the code */}
@@ -389,5 +400,11 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 15,
     fontWeight: "700",
+  },
+  errorDetail: {
+    fontSize: 13,
+    color: Colors.danger ?? "#DC2626",
+    marginTop: 6,
+    textAlign: "center",
   },
 });
