@@ -23,12 +23,22 @@ export default function Missions() {
   const router = useRouter();
   const { theme } = useContext(ThemeContext);
   const [selectedType, setSelectedType] = useState("All");
-  const { isCompleted, completedIds } = useProgress();
-  const { missions, loading, error } = useContext(ContentContext);
-  const colorTheme = Colors[theme] || Colors.light;
-  const tabBarClearance = useTabBarClearance();
+  const {
+    isCompleted,
+    loading: progressLoading,
+    error: progressError,
+  } = useProgress();
+  const {
+    missions,
+    error: missionsError,
+    loading: missionsLoading,
+  } = useContext(ContentContext);
 
-  const completedCount = completedIds?.length ?? 0;
+  const error = missionsError || progressError;
+  const loading = missionsLoading || progressLoading;
+
+  const tabBarClearance = useTabBarClearance();
+  const colorTheme = Colors[theme] || Colors.light;
 
   const missionTypes = useMemo(() => {
     if (loading || !missions) return [];
@@ -42,7 +52,7 @@ export default function Missions() {
       selectedType === "All"
         ? [...missions]
         : missions.filter((m) => m.type === selectedType)
-    ).sort((a, b) => isCompleted(a.id) - isCompleted(b.id)); // completed sink to bottom, as the comment says
+    ).sort((a, b) => isCompleted(b.id) - isCompleted(a.id));
   }, [loading, missions, selectedType, isCompleted]);
 
   if (loading) {
@@ -78,16 +88,6 @@ export default function Missions() {
         <ThemedText title={true} style={styles.header}>
           Missions
         </ThemedText>
-        <View style={styles.trophy}>
-          <Ionicons name="trophy" size={24} color={colorTheme.title} />
-        </View>
-        {completedCount > 0 && (
-          <View style={styles.trophyBadge}>
-            <Text style={styles.trophyBadgeText}>
-              {completedCount > 99 ? "99+" : completedCount}
-            </Text>
-          </View>
-        )}
       </ThemedView>
       {/* Mission type filter chips */}
       <FilterChips
@@ -169,10 +169,6 @@ const styles = StyleSheet.create({
     marginBottom: 8,
     paddingHorizontal: 16,
   },
-  trophy: {
-    padding: 4,
-    paddingHorizontal: 16,
-  },
   typeRow: {
     marginTop: 16,
     marginBottom: 16,
@@ -224,28 +220,6 @@ const styles = StyleSheet.create({
   },
   doneBadgeText: {
     color: Colors.success,
-    fontWeight: "700",
-  },
-  trophy: {
-    padding: 4,
-    paddingHorizontal: 16,
-    position: "relative",
-  },
-  trophyBadge: {
-    position: "absolute",
-    top: 0,
-    right: 8,
-    minWidth: 16,
-    height: 16,
-    borderRadius: 8,
-    paddingHorizontal: 3,
-    backgroundColor: Colors.accent,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  trophyBadgeText: {
-    color: "#fff",
-    fontSize: 10,
     fontWeight: "700",
   },
 });

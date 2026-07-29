@@ -24,3 +24,6 @@ export const getRewards = async (token) => {
   return response.json();
 };
 
+
+
+

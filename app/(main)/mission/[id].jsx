@@ -3,6 +3,7 @@ import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import ThemedView from "../../../components/ThemedView";
+import ThemedText from "../../../components/ThemedText";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import SuccessModal from "../../../components/SuccessModal";
 import { Colors } from "../../../constants/Colors";
@@ -157,7 +158,16 @@ export default function MissionDetail() {
               </Text>
             </TouchableOpacity>
           )}
-
+          {saved && (
+            <View style={styles.finishedContainer}>
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={Colors.success}
+              />
+              <Text style={styles.finishedText}>Mission Completed!</Text>
+            </View>
+          )}
           {submitError && (
             <Text style={[styles.errorDetail, { marginTop: 10 }]}>
               {submitError}
@@ -366,5 +376,21 @@ const styles = StyleSheet.create({
     color: Colors.danger ?? "#DC2626",
     marginTop: 6,
     textAlign: "center",
+  },
+  finishedContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: Colors.success,
+    backgroundColor: "rgba(34, 197, 94, 0.12)", // matching translucent success tone
+  },
+  finishedText: {
+    color: Colors.success,
+    fontSize: 16,
+    fontWeight: "700",
+    marginLeft: 8,
   },
 });
