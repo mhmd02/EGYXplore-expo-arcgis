@@ -45,12 +45,12 @@ export function UserProvider({ children }) {
     return result;
   };
 
-  const logout = () => {
+  const logout = async () => {
     setUser(null);
     setToken(null);
     setIsLoading(false);
+    await SecureStore.deleteItemAsync("token");
   };
-
   const updateUser = (patch) => setUser((prev) => ({ ...prev, ...patch }));
   return (
     <UserContext.Provider

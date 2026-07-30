@@ -127,40 +127,46 @@ export default function Rewards() {
           const redeemed = isRedeemed(reward.id);
           const affordable = totalPoints >= reward.points;
           return (
-            <Card key={reward.id} style={styles.card}>
-              <View style={styles.cardInfo}>
-                <Text style={[styles.cardName, { color: colorTheme.title }]}>
-                  {reward.title}
-                </Text>
-                {reward.desc && (
-                  <Text
-                    style={[styles.cardSponsor, { color: colorTheme.text }]}
-                  >
-                    {reward.desc}
+            <TouchableOpacity
+              onPress={() => router.push(`/reward/${reward.id}`)}
+              disabled={!affordable || redeemed}
+              key={reward.id}
+            >
+              <Card key={reward.id} style={styles.card} variant="pharaonic">
+                <View style={styles.cardInfo}>
+                  <Text style={[styles.cardName, { color: colorTheme.title }]}>
+                    {reward.title}
                   </Text>
-                )}
-                <Text style={styles.cardCost}>⭐ {reward.points} pts</Text>
-              </View>
-
-              {redeemed ? (
-                <View style={styles.redeemedBadge}>
-                  <Text style={styles.redeemedBadgeText}>✓ Redeemed</Text>
+                  {reward.desc && (
+                    <Text
+                      style={[styles.cardSponsor, { color: colorTheme.text }]}
+                    >
+                      {reward.desc}
+                    </Text>
+                  )}
+                  <Text style={styles.cardCost}>⭐ {reward.points} pts</Text>
                 </View>
-              ) : (
-                <TouchableOpacity
-                  style={[
-                    styles.redeemButton,
-                    !affordable && { backgroundColor: colorTheme.border },
-                  ]}
-                  disabled={!affordable}
-                  onPress={() => router.push(`/reward/${reward.id}`)}
-                >
-                  <Text style={styles.redeemButtonText}>
-                    {affordable ? "Redeem" : "Locked"}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </Card>
+
+                {redeemed ? (
+                  <View style={styles.redeemedBadge}>
+                    <Text style={styles.redeemedBadgeText}>✓ Redeemed</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={[
+                      styles.redeemButton,
+                      !affordable && { backgroundColor: colorTheme.border },
+                    ]}
+                    disabled={!affordable}
+                    onPress={() => router.push(`/reward/${reward.id}`)}
+                  >
+                    <Text style={styles.redeemButtonText}>
+                      {affordable ? "Redeem" : "Locked"}
+                    </Text>
+                  </TouchableOpacity>
+                )}
+              </Card>
+            </TouchableOpacity>
           );
         })}
       </ScrollView>
