@@ -113,15 +113,15 @@ export default function Trips() {
           </ThemedText>
         </View>
         <View style={styles.cardTopRow}>
-          <ThemedView style={styles.statusContainer}>
-            <ThemedText style={styles.statusText}>{item.status}</ThemedText>
-          </ThemedView>
           {item.rating && (
             <View style={styles.ratingBadge}>
               <Ionicons name="star" size={13} color="#D4AF37" />
               <Text style={styles.ratingText}>{item.rating}</Text>
             </View>
           )}
+          <ThemedView style={styles.statusContainer}>
+            <ThemedText style={styles.statusText}>{item.status}</ThemedText>
+          </ThemedView>
         </View>
         {/* Card Footer: Explore Link & Action Button in Flow Layout */}
         <View style={styles.cardFooter}>
