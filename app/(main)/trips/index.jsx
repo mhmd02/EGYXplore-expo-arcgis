@@ -18,6 +18,7 @@ import Card from "../../../components/Card";
 import ThemedButton from "../../../components/ThemedButton";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import FilterChips from "../../../components/FilterChips";
+import { useTabBarClearance } from "../../../constants/layout";
 
 export default function Trips() {
   const { theme, setTheme } = useContext(ThemeContext);
@@ -26,6 +27,7 @@ export default function Trips() {
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [addedTripIds, setAddedTripIds] = useState([]);
 
+  const tabBarClearance = useTabBarClearance();
   const colorTheme = Colors[theme] ?? Colors.light;
 
   const toggleAddTrip = (id) => {
@@ -161,44 +163,55 @@ export default function Trips() {
   };
 
   return (
-    <ThemedView safe={true} style={styles.container}>
-      <View style={styles.headerRow}>
-        <ThemedText
-          title={true}
-          style={[styles.header, { transform: [{ translateY: -4 }] }]}
-        >
-          Sanctuaries
-        </ThemedText>
-
-        <View style={styles.iconButtonContainer}>
-          <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="locate-outline" size={20} color="#fff" />
-          </TouchableOpacity>
-
-          {/* AI Icon */}
-          <TouchableOpacity
-            style={[styles.iconBtn, styles.aiBtn]}
-            onPress={() => router.push("/trips/ai")}
+    <ThemedView
+      safe={true}
+      style={[
+        styles.container,
+        {
+          backgroundColor: colorTheme.background,
+          marginBottom: tabBarClearance,
+        },
+      ]}
+    >
+      <View style={styles.container}>
+        <View style={styles.headerRow}>
+          <ThemedText
+            title={true}
+            style={[styles.header, { transform: [{ translateY: -4 }] }]}
           >
-            <Ionicons name="eye-outline" size={20} color="#fff" />
-            <Text style={[styles.iconBtnText, { color: "#fff" }]}>AI</Text>
-          </TouchableOpacity>
+            Sanctuaries
+          </ThemedText>
+
+          <View style={styles.iconButtonContainer}>
+            <TouchableOpacity style={styles.iconBtn}>
+              <Ionicons name="locate-outline" size={20} color="#fff" />
+            </TouchableOpacity>
+
+            {/* AI Icon */}
+            <TouchableOpacity
+              style={[styles.iconBtn, styles.aiBtn]}
+              onPress={() => router.push("/trips/ai")}
+            >
+              <Ionicons name="eye-outline" size={20} color="#fff" />
+              <Text style={[styles.iconBtnText, { color: "#fff" }]}>AI</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+        <FilterChips
+          options={["All", ...destinationsTypes]}
+          selected={selectedCategory}
+          onSelect={setSelectedCategory}
+          style={styles.typeRow}
+          contentContainerStyle={{ paddingLeft: 16, paddingRight: 16 }}
+        />
+        <FlatList
+          data={visibleTrips}
+          keyExtractor={(item) => item.id.toString()}
+          contentContainerStyle={styles.list}
+          renderItem={renderItems}
+          showsVerticalScrollIndicator={false}
+        />
       </View>
-      <FilterChips
-        options={["All", ...destinationsTypes]}
-        selected={selectedCategory}
-        onSelect={setSelectedCategory}
-        style={styles.typeRow}
-        contentContainerStyle={{ paddingLeft: 16, paddingRight: 16 }}
-      />
-      <FlatList
-        data={visibleTrips}
-        keyExtractor={(item) => item.id.toString()}
-        contentContainerStyle={styles.list}
-        renderItem={renderItems}
-        showsVerticalScrollIndicator={false}
-      />
     </ThemedView>
   );
 }
@@ -206,6 +219,10 @@ export default function Trips() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  scrollContent: {
+    padding: 16,
+    paddingBottom: 120,
   },
   centered: {
     justifyContent: "center",
@@ -220,7 +237,7 @@ const styles = StyleSheet.create({
   },
   errorDetail: {
     fontSize: 13,
-    color: Colors.danger ?? "#DC2626",
+    color: Colors.warning ?? "#DC2626",
     marginTop: 6,
     textAlign: "center",
   },
@@ -231,7 +248,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   list: {
-    paddingBottom: 100,
+    paddingBottom: 5,
   },
   card: {
     marginHorizontal: 16,

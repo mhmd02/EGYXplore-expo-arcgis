@@ -164,7 +164,7 @@ const styles = StyleSheet.create({
   },
   errorDetail: {
     fontSize: 13,
-    color: Colors.danger ?? "#DC2626",
+    color: Colors.warning ?? "#DC2626",
     marginTop: 6,
     textAlign: "center",
   },
@@ -184,7 +184,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     gap: 12,
-    paddingBottom: 24,
+    paddingBottom: 12,
   },
   card: {
     flexDirection: "row",

@@ -12,6 +12,7 @@ import ThemedText from "../../../components/ThemedText";
 import ThemedView from "../../../components/ThemedView";
 import ThemedCard from "../../../components/ThemedCard";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
+import { useTabBarClearance } from "../../../constants/layout";
 
 export default function TripDetail() {
   const [destinationDetails, setDestinationDetails] = useState(null);
@@ -19,6 +20,7 @@ export default function TripDetail() {
   const { token } = useUser();
   const { id } = useLocalSearchParams();
 
+  const tabBarClearance = useTabBarClearance();
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
 
@@ -60,121 +62,131 @@ export default function TripDetail() {
   }
 
   return (
-    <ScrollView
-      style={[styles.container, { backgroundColor: colorTheme.background }]}
-      showsVerticalScrollIndicator={false}
-      contentContainerStyle={styles.scrollContent}
-    >
-      {/* Hero Image with Robust Error & Null Handling */}
-      <View style={styles.imageContainer}>
-        {destinationDetails.image && destinationDetails.image !== "null" ? (
-          <Image
-            source={{ uri: proxiedImageUrl(destinationDetails.image) }}
-            style={styles.image}
-            onError={(e) =>
-              console.log("IMAGE LOAD ERROR:", e.nativeEvent.error)
-            }
-          />
-        ) : (
-          <View style={[styles.image, styles.fallbackImage]}>
-            <Ionicons
-              name="image-outline"
-              size={40}
-              color={colorTheme.text ?? "#888"}
+    <ThemedView safe={true} style={[styles.container, { paddingTop: 0 }]}>
+      <ScrollView
+        style={[
+          styles.container,
+          {
+            backgroundColor: colorTheme.background,
+          },
+        ]}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabBarClearance },
+        ]}
+      >
+        {/* Hero Image with Robust Error & Null Handling */}
+        <View style={styles.imageContainer}>
+          {destinationDetails.image && destinationDetails.image !== "null" ? (
+            <Image
+              source={{ uri: proxiedImageUrl(destinationDetails.image) }}
+              style={styles.image}
+              onError={(e) =>
+                console.log("IMAGE LOAD ERROR:", e.nativeEvent.error)
+              }
             />
-            <ThemedText style={styles.fallbackText}>
-              No Image Available
-            </ThemedText>
-          </View>
-        )}
+          ) : (
+            <View style={[styles.image, styles.fallbackImage]}>
+              <Ionicons
+                name="image-outline"
+                size={40}
+                color={colorTheme.text ?? "#888"}
+              />
+              <ThemedText style={styles.fallbackText}>
+                No Image Available
+              </ThemedText>
+            </View>
+          )}
 
-        {destinationDetails.status && (
-          <View style={styles.statusBadge}>
-            <Text style={styles.statusTextBadge}>
-              {destinationDetails.status}
-            </Text>
-          </View>
-        )}
-      </View>
-
-      {/* Header Info */}
-      <View style={styles.headerSection}>
-        <ThemedText title={true} style={styles.title}>
-          {destinationDetails.name}
-        </ThemedText>
-
-        <View style={styles.locationRow}>
-          <Ionicons
-            name="location-outline"
-            size={18}
-            color={Colors.primary ?? "#D4AF37"}
-          />
-          <ThemedText style={styles.cityText}>
-            {destinationDetails.city}
-          </ThemedText>
+          {destinationDetails.status && (
+            <View style={styles.statusBadge}>
+              <Text style={styles.statusTextBadge}>
+                {destinationDetails.status}
+              </Text>
+            </View>
+          )}
         </View>
 
-        <View style={styles.statsRow}>
-          <View style={styles.statItem}>
-            <Ionicons name="star" size={16} color="#D4AF37" />
-            <ThemedText style={styles.statText}>
-              {destinationDetails.rating} / 5
-            </ThemedText>
-          </View>
-          <View style={styles.statItem}>
+        {/* Header Info */}
+        <View style={styles.headerSection}>
+          <ThemedText title={true} style={styles.title}>
+            {destinationDetails.name}
+          </ThemedText>
+
+          <View style={styles.locationRow}>
             <Ionicons
-              name="people-outline"
-              size={16}
+              name="location-outline"
+              size={18}
               color={Colors.primary ?? "#D4AF37"}
             />
-            <ThemedText style={styles.statText}>
-              {destinationDetails.visitors} Visitors
+            <ThemedText style={styles.cityText}>
+              {destinationDetails.city}
             </ThemedText>
           </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statItem}>
+              <Ionicons name="star" size={16} color="#D4AF37" />
+              <ThemedText style={styles.statText}>
+                {destinationDetails.rating} / 5
+              </ThemedText>
+            </View>
+            <View style={styles.statItem}>
+              <Ionicons
+                name="people-outline"
+                size={16}
+                color={Colors.primary ?? "#D4AF37"}
+              />
+              <ThemedText style={styles.statText}>
+                {destinationDetails.visitors} Visitors
+              </ThemedText>
+            </View>
+          </View>
         </View>
-      </View>
 
-      {/* Quick Info Cards */}
-      <View style={styles.cardContainer}>
-        <ThemedCard style={styles.card}>
-          <Ionicons
-            name="time-outline"
-            size={24}
-            color="#D4AF37"
-            style={styles.cardIcon}
-          />
-          <ThemedText style={styles.cardValue}>
-            {destinationDetails.openHour || "Not specified"}
+        {/* Quick Info Cards */}
+        <View style={styles.cardContainer}>
+          <ThemedCard style={styles.card}>
+            <Ionicons
+              name="time-outline"
+              size={24}
+              color="#D4AF37"
+              style={styles.cardIcon}
+            />
+            <ThemedText style={styles.cardValue}>
+              {destinationDetails.openHour || "Not specified"}
+            </ThemedText>
+            <ThemedText style={styles.cardLabel}>Opening Hours</ThemedText>
+          </ThemedCard>
+
+          <ThemedCard style={styles.card}>
+            <Ionicons
+              name="ticket-outline"
+              size={24}
+              color="#D4AF37"
+              style={styles.cardIcon}
+            />
+            <ThemedText style={styles.cardValue}>
+              {destinationDetails.ticketPrice
+                ? `${destinationDetails.ticketPrice} EGP`
+                : "Free"}
+            </ThemedText>
+            <ThemedText style={styles.cardLabel}>Entry Fee</ThemedText>
+          </ThemedCard>
+        </View>
+
+        {/* Description */}
+        <View style={styles.section}>
+          <ThemedText title={true} style={styles.sectionTitle}>
+            About
           </ThemedText>
-          <ThemedText style={styles.cardLabel}>Opening Hours</ThemedText>
-        </ThemedCard>
-
-        <ThemedCard style={styles.card}>
-          <Ionicons
-            name="ticket-outline"
-            size={24}
-            color="#D4AF37"
-            style={styles.cardIcon}
-          />
-          <ThemedText style={styles.cardValue}>
-            {destinationDetails.ticketPrice
-              ? `${destinationDetails.ticketPrice} EGP`
-              : "Free"}
+          <ThemedText style={styles.description}>
+            {destinationDetails.description || "No description provided."}
           </ThemedText>
-          <ThemedText style={styles.cardLabel}>Entry Fee</ThemedText>
-        </ThemedCard>
-      </View>
-
-      {/* Description */}
-      <View style={styles.section}>
-        <ThemedText title={true} style={styles.sectionTitle}>
-          About
-        </ThemedText>
-        <ThemedText style={styles.description}>
-          {destinationDetails.description || "No description provided."}
-        </ThemedText>
-      </View>
-    </ScrollView>
+        </View>
+      </ScrollView>
+    </ThemedView>
   );
 }
 
@@ -184,7 +196,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     padding: 16,
-    paddingBottom: 120,
   },
   centered: {
     flex: 1,
