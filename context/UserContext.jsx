@@ -49,7 +49,10 @@ export function UserProvider({ children }) {
     setUser(null);
     setToken(null);
     setIsLoading(false);
-    await SecureStore.deleteItemAsync("token");
+    await Promise.all([
+      SecureStore.deleteItemAsync("token"),
+      SecureStore.deleteItemAsync("user"),
+    ]);
   };
   const updateUser = (patch) => setUser((prev) => ({ ...prev, ...patch }));
   return (

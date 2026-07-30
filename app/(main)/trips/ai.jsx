@@ -14,7 +14,7 @@ import {
 } from "react-native";
 import { Stack } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { useContext, useRef, useState } from "react";
+import { useContext, useEffect, useRef, useState } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { ThemeContext } from "../../../context/ThemeContext";
@@ -28,44 +28,47 @@ import {
   sendChatMessage,
   getHistory,
   getHistorySession,
+  AiAuthenticationError,
 } from "../../../api/aiApi";
-import { useEffect } from "react";
+import { useUser } from "../../../context/UserContext";
 import ThemedText from "../../../components/ThemedText";
 import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedView from "../../../components/ThemedView";
 import CustomChoose from "../../../components/CustomChoose";
 import VoiceNotePlayer from "../../../components/Playback";
 
-// --- Module-Level Session Memory ---
-// These variables live in memory as long as the app is running.
-// If the user navigates away and the screen unmounts, the chat is preserved here.
-// When the app is fully closed, this memory is wiped clean.
-let activeSessionMessages = [];
-let activeSessionId = null;
-
 export default function Chat() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const tabBarPadding = 60 + (insets.bottom > 0 ? insets.bottom : 16);
+  const { user, token, logout } = useUser();
   const [alertVisible, setAlertVisible] = useState(false);
   const [images, setImages] = useState([]);
   const [text, setText] = useState("");
   const [audioUri, setAudioUri] = useState(null);
 
-  // Initialize state from our module-level memory
-  const [messages, setMessages] = useState(activeSessionMessages);
-  const [chatSessionId, setChatSessionId] = useState(activeSessionId);
+  const [messages, setMessages] = useState([]);
+  const [chatSessionId, setChatSessionId] = useState(null);
   const [sending, setSending] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [historySessions, setHistorySessions] = useState([]);
   const listRef = useRef(null);
+  const currentAuthRef = useRef({ token, userId: user?.id });
+  currentAuthRef.current = { token, userId: user?.id };
 
-  // Sync state changes back to the module-level memory so it survives unmounting
+  // AI state belongs to the current authenticated account only.
   useEffect(() => {
-    activeSessionMessages = messages;
-    activeSessionId = chatSessionId;
-  }, [messages, chatSessionId]);
+    setMessages([]);
+    setChatSessionId(null);
+    setHistorySessions([]);
+    setShowHistory(false);
+    setSending(false);
+    setAlertVisible(false);
+    setImages([]);
+    setAudioUri(null);
+    setText("");
+  }, [token, user?.id]);
 
   const { isRecording, toggleRecording } = useRecordAndUploadAudio(
     handleRecordingComplete,
@@ -75,25 +78,39 @@ export default function Chat() {
     if (showHistory) {
       loadHistoryList();
     }
-  }, [showHistory]);
+  }, [showHistory, token]);
+
+  async function handleAuthenticationError(error) {
+    if (!(error instanceof AiAuthenticationError)) return false;
+
+    await logout();
+    Alert.alert("Session expired", error.message);
+    return true;
+  }
 
   async function loadHistoryList() {
+    const requestToken = token;
     try {
-      const sessions = await getHistory();
-      if (sessions && sessions.length > 0) {
-        sessions.sort(
-          (a, b) => new Date(b.updatedDate || 0) - new Date(a.updatedDate || 0),
-        );
-        setHistorySessions(sessions);
-      }
+      const sessions = await getHistory(requestToken);
+      if (currentAuthRef.current.token !== requestToken) return;
+
+      const sortedSessions = [...(sessions ?? [])].sort(
+        (a, b) => new Date(b.updatedDate || 0) - new Date(a.updatedDate || 0),
+      );
+      setHistorySessions(sortedSessions);
     } catch (e) {
+      if (currentAuthRef.current.token !== requestToken) return;
+      if (await handleAuthenticationError(e)) return;
       console.warn("Could not load chat history list:", e);
     }
   }
 
   async function loadSpecificSession(sessionId) {
+    const requestToken = token;
     try {
-      const sessionData = await getHistorySession(sessionId);
+      const sessionData = await getHistorySession(requestToken, sessionId);
+      if (currentAuthRef.current.token !== requestToken) return;
+
       if (sessionData && sessionData.messages) {
         setMessages(sessionData.messages);
         setChatSessionId(sessionData.id);
@@ -101,6 +118,8 @@ export default function Chat() {
         setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 100);
       }
     } catch (e) {
+      if (currentAuthRef.current.token !== requestToken) return;
+      if (await handleAuthenticationError(e)) return;
       Alert.alert("Error", "Could not load this conversation.");
     }
   }
@@ -152,6 +171,7 @@ export default function Chat() {
       .map(({ role, content }) => ({ role, content })); // prior turns, before this message
     const currentImages = [...images];
     const currentAudio = audioUri;
+    const requestToken = token;
 
     const userMsg = {
       role: "user",
@@ -169,12 +189,15 @@ export default function Chat() {
 
     try {
       const data = await sendChatMessage(
+        requestToken,
         trimmed,
         history,
         currentImages,
         currentAudio,
         chatSessionId,
       );
+      if (currentAuthRef.current.token !== requestToken) return;
+
       setMessages([
         ...next,
         { role: "assistant", content: data.reply, images: data.photoUrls },
@@ -188,15 +211,20 @@ export default function Chat() {
         Alert.alert("Trip saved", data.tripPlanTitle || "Your trip was saved.");
       }
     } catch (e) {
+      if (currentAuthRef.current.token !== requestToken) return;
+      if (await handleAuthenticationError(e)) return;
+
       setMessages([
         ...next,
         { role: "assistant", content: e.message || "Something went wrong." },
       ]);
     } finally {
-      setSending(false);
-      requestAnimationFrame(() =>
-        listRef.current?.scrollToEnd({ animated: true }),
-      );
+      if (currentAuthRef.current.token === requestToken) {
+        setSending(false);
+        requestAnimationFrame(() =>
+          listRef.current?.scrollToEnd({ animated: true }),
+        );
+      }
     }
   }
 
@@ -226,22 +254,32 @@ export default function Chat() {
           {item.images && item.images.length > 0 && (
             <View style={styles.bubbleImagesGrid}>
               {item.images.map((imgUri, idx) => {
-                const cleanUrl = imgUri.startsWith("//")
-                  ? imgUri.replace("//", "")
-                  : imgUri.replace("https://", "");
-                const proxiedUri = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
+                // Only proxy remote URLs; local file:// URIs are used directly
+                const isRemote =
+                  imgUri.startsWith("http://") ||
+                  imgUri.startsWith("https://") ||
+                  imgUri.startsWith("//");
+                let displayUri;
+                if (isRemote) {
+                  const cleanUrl = imgUri.startsWith("//")
+                    ? imgUri.replace("//", "")
+                    : imgUri.replace("https://", "");
+                  displayUri = `https://wsrv.nl/?url=${encodeURIComponent(cleanUrl)}`;
+                } else {
+                  displayUri = imgUri;
+                }
 
                 return (
                   <TouchableOpacity
                     key={idx}
                     onPress={() => {
                       import("react-native").then(({ Linking }) =>
-                        Linking.openURL(proxiedUri),
+                        Linking.openURL(displayUri),
                       );
                     }}
                   >
                     <Image
-                      source={{ uri: proxiedUri }}
+                      source={{ uri: displayUri }}
                       style={[styles.bubbleImage]}
                       resizeMode="cover"
                     />
