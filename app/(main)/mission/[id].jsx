@@ -219,8 +219,10 @@ const styles = StyleSheet.create({
     flex: 1,
     padding: 20,
     justifyContent: "center",
+    alignItems: "center",
   },
   card: {
+    width: "100%",
     borderRadius: 20,
     padding: 22,
     borderWidth: 1,

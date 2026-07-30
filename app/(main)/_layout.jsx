@@ -1,6 +1,10 @@
 import { View, StyleSheet, ActivityIndicator } from "react-native";
 import { Redirect, Stack, Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import {
+  FontAwesome,
+  Ionicons,
+  MaterialCommunityIcons,
+} from "@expo/vector-icons";
 import { useContext } from "react";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Colors } from "../../constants/Colors";
@@ -79,12 +83,12 @@ export default function MainLayout() {
         <Tabs.Screen
           name="trips"
           options={{
-            title: "Trips",
+            title: "Sanctuaries",
             tabBarIcon: ({ focused, color }) => (
               <Ionicons
                 name={focused ? "map" : "map-outline"}
                 size={24}
-                color={color}
+                color={colorTheme.title}
               />
             ),
           }}

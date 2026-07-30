@@ -19,7 +19,7 @@ export default function SuccessModal({
   return (
     <Modal
       visible={visible}
-      transparent
+      transparent={true}
       animationType="fade"
       onRequestClose={onRequestClose}
       statusBarTranslucent={true}

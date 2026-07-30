@@ -24,6 +24,48 @@ export const getRewards = async (token) => {
   return response.json();
 };
 
+export const getDestinations = async (token) => {
+  const response = await fetch(`${API_BASE_URL}/MobileDestination/AllDest`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  if (!response.ok) {
+    throw new Error(`Failed to fetch destinations: ${response.status}`);
+  }
+  return response.json();
+};
 
+export const getDestinationDetails = async (token, destinationId) => {
+  const response = await fetch(
+    `${API_BASE_URL}/MobileDestination/GetDestinationById`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ destinationId }),
+    },
+  );
 
+  if (!response.ok) {
+    const rawText = await response.text();
+    console.log("RAW ERROR BODY:", rawText); // ← temporary, check your Metro/dev console
 
+    let errorBody = {};
+    try {
+      errorBody = JSON.parse(rawText);
+    } catch {
+      // not JSON — rawText itself is the useful info, already logged above
+    }
+
+    throw new Error(
+      errorBody.message ||
+        rawText ||
+        `Failed to fetch a destination: ${response.status}`,
+    );
+  }
+
+  return response.json();
+};

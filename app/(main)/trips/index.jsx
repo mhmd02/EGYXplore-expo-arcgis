@@ -5,24 +5,28 @@ import {
   View,
   Text,
 } from "react-native";
-import { useContext, useState } from "react";
+import { useContext, useState, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Colors } from "../../../constants/Colors";
 import { trips } from "../../../constants/trips";
 import { ThemeContext } from "../../../context/ThemeContext";
+import { ContentContext } from "../../../context/ContentContext";
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
-import ThemedCard from "../../../components/ThemedCard";
+import Card from "../../../components/Card";
 import ThemedButton from "../../../components/ThemedButton";
+import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import FilterChips from "../../../components/FilterChips";
 
 export default function Trips() {
   const { theme, setTheme } = useContext(ThemeContext);
-  const colorTheme = Colors[theme] ?? Colors.light;
+  const { destinations, loading, error } = useContext(ContentContext);
+  const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState("All");
   const [addedTripIds, setAddedTripIds] = useState([]);
-  const router = useRouter();
+
+  const colorTheme = Colors[theme] ?? Colors.light;
 
   const toggleAddTrip = (id) => {
     setAddedTripIds((prevIds) =>
@@ -32,50 +36,130 @@ export default function Trips() {
     );
   };
 
-  const categories = ["All", ...new Set(trips.map((trip) => trip.category))];
-  const visibleTrips =
-    selectedCategory === "All"
-      ? trips
-      : trips.filter((trip) => trip.category === selectedCategory);
+  const destinationsTypes = useMemo(() => {
+    if (loading || !destinations) return [];
+    const uniqueTypes = [...new Set(destinations.map((dest) => dest.category))];
+    return uniqueTypes;
+  }, [destinations, loading]);
+
+  const visibleTrips = useMemo(() => {
+    if (loading || !destinations) return [];
+    return selectedCategory === "All"
+      ? [...destinations]
+      : destinations.filter((dest) => dest.category === selectedCategory);
+  }, [loading, destinations, selectedCategory]);
+
+  if (loading) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <CustomThemedLoader />
+        <ThemedText style={styles.statusText}>
+          Loading destinations...
+        </ThemedText>
+      </ThemedView>
+    );
+  }
+  if (error) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <ThemedText style={styles.statusText}>
+          Something went wrong loading destinations.
+        </ThemedText>
+        <Text style={styles.errorDetail}>{String(error)}</Text>
+      </ThemedView>
+    );
+  }
+  if (!destinations || destinations.length === 0) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <ThemedText style={styles.statusText}>
+          No destinations available right now.
+        </ThemedText>
+      </ThemedView>
+    );
+  }
 
   const renderItems = ({ item }) => {
     const isAdded = addedTripIds.includes(item.id);
 
     return (
-      <ThemedCard style={styles.card} key={item.id}>
+      <Card style={styles.card} key={item.id} variant="pharaonic">
+        {/* Top Header Row: Category Badge & Rating Badge */}
         <ThemedText style={styles.title} title={true}>
-          {item.title}
+          {item.name}
         </ThemedText>
-        <ThemedText>{item.location}</ThemedText>
-        <ThemedText>{item.category}</ThemedText>
-        <TouchableOpacity
-          onPress={() => router.push(`/trips/${item.id}`)}
-          style={styles.detailsButton}
+
+        {/* Title */}
+
+        {/* Authentic Papyrus-styled Description Box */}
+        <View
+          style={[
+            styles.descriptionBox,
+            {
+              backgroundColor:
+                theme === "dark"
+                  ? "rgba(212, 175, 55, 0.05)"
+                  : "rgba(245, 239, 230, 0.6)",
+            },
+          ]}
         >
           <ThemedText
-            style={{ color: Colors.accent, textAlignVertical: "center" }}
+            style={[styles.description, { color: colorTheme.text }]}
+            numberOfLines={3}
           >
-            More details
+            {item.description}
           </ThemedText>
-          <Ionicons
-            name="arrow-forward"
-            size={18}
-            color={Colors.accent}
-            style={{ transform: [{ translateY: 2 }] }}
-          />
-        </TouchableOpacity>
+        </View>
+        <View style={styles.cardTopRow}>
+          <ThemedView style={styles.statusContainer}>
+            <ThemedText style={styles.statusText}>{item.status}</ThemedText>
+          </ThemedView>
+          {item.rating && (
+            <View style={styles.ratingBadge}>
+              <Ionicons name="star" size={13} color="#D4AF37" />
+              <Text style={styles.ratingText}>{item.rating}</Text>
+            </View>
+          )}
+        </View>
+        {/* Card Footer: Explore Link & Action Button in Flow Layout */}
+        <View style={styles.cardFooter}>
+          <TouchableOpacity
+            onPress={() => router.push(`/trips/${item.id}`)}
+            style={styles.detailsButton}
+          >
+            <ThemedText style={{ color: Colors.accent, fontWeight: "600" }}>
+              Explore
+            </ThemedText>
+            <Ionicons
+              name="arrow-forward"
+              size={16}
+              color={Colors.accent}
+              style={{ transform: [{ translateY: 1 }] }}
+            />
+          </TouchableOpacity>
 
-        <TouchableOpacity
-          style={[isAdded ? styles.done : styles.addIcon]}
-          onPress={() => toggleAddTrip(item.id)}
-        >
-          <Text style={{ color: isAdded ? Colors.success : "white" }}>
-            {isAdded ? "✓ Done" : "Add"}
-          </Text>
-        </TouchableOpacity>
-      </ThemedCard>
+          <TouchableOpacity
+            style={[
+              styles.actionButton,
+              isAdded ? styles.done : styles.addIcon,
+            ]}
+            onPress={() => toggleAddTrip(item.id)}
+          >
+            <Text
+              style={{
+                color: isAdded ? Colors.success : "white",
+                fontWeight: "700",
+                fontSize: 13,
+              }}
+            >
+              {isAdded ? "✓ Added" : "Add to Itinerary"}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </Card>
     );
   };
+
   return (
     <ThemedView safe={true} style={styles.container}>
       <View style={styles.headerRow}>
@@ -83,38 +167,26 @@ export default function Trips() {
           title={true}
           style={[styles.header, { transform: [{ translateY: -4 }] }]}
         >
-          Trips
+          Sanctuaries
         </ThemedText>
 
         <View style={styles.iconButtonContainer}>
           <TouchableOpacity style={styles.iconBtn}>
-            <Ionicons name="create-outline" size={20} color="#fff" />
-            <Text style={{ color: "#fff", fontSize: 16 }}>Create</Text>
+            <Ionicons name="locate-outline" size={20} color="#fff" />
           </TouchableOpacity>
 
           {/* AI Icon */}
           <TouchableOpacity
-            style={[styles.iconBtn, { backgroundColor: colorTheme.text }]}
+            style={[styles.iconBtn, styles.aiBtn]}
             onPress={() => router.push("/trips/ai")}
           >
-            <Ionicons
-              name="eye-outline"
-              size={20}
-              color={theme === "dark" ? "black" : "#fff"}
-            />
-            <Text
-              style={{
-                color: theme === "dark" ? "#000" : "#fff",
-                fontSize: 16,
-              }}
-            >
-              AI
-            </Text>
+            <Ionicons name="eye-outline" size={20} color="#fff" />
+            <Text style={[styles.iconBtnText, { color: "#fff" }]}>AI</Text>
           </TouchableOpacity>
         </View>
       </View>
       <FilterChips
-        options={categories}
+        options={["All", ...destinationsTypes]}
         selected={selectedCategory}
         onSelect={setSelectedCategory}
         style={styles.typeRow}
@@ -130,9 +202,27 @@ export default function Trips() {
     </ThemedView>
   );
 }
+
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  centered: {
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 24,
+  },
+  statusText: {
+    fontSize: 16,
+    fontWeight: "600",
+    marginTop: 12,
+    textAlign: "center",
+  },
+  errorDetail: {
+    fontSize: 13,
+    color: Colors.danger ?? "#DC2626",
+    marginTop: 6,
+    textAlign: "center",
   },
   header: {
     fontSize: 32,
@@ -144,65 +234,120 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   card: {
-    marginHorizontal: 16, // Changed to marginHorizontal to align better
-    marginVertical: 8,
+    marginHorizontal: 16,
+    marginVertical: 10,
+    borderRadius: 16,
+    padding: 18,
+    borderWidth: 1,
+    borderColor: "#D4AF37", // Pharaonic Gold Border
   },
-  title: { fontWeight: "bold", fontSize: 18 },
+  cardTopRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    alignContent: "center",
+    marginBottom: 8,
+  },
+  title: {
+    fontWeight: "800",
+    fontSize: 20,
+    color: "#D4AF37", // Deep Royal Gold
+    letterSpacing: 0.4,
+    marginBottom: 8,
+  },
+  ratingBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "rgba(212, 175, 55, 0.15)",
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "rgba(212, 175, 55, 0.4)",
+    gap: 4,
+  },
+  ratingText: {
+    fontSize: 12,
+    fontWeight: "700",
+    color: "#D4AF37",
+  },
+  statusContainer: {
+    alignSelf: "flex-start",
+    backgroundColor: "rgba(2, 132, 199, 0.1)",
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    fontWeight: "700",
+    color: Colors.primary,
+    textTransform: "uppercase",
+    letterSpacing: 0.8,
+  },
+  descriptionBox: {
+    padding: 10,
+    borderRadius: 8,
+    marginBottom: 14,
+    borderLeftWidth: 3,
+    borderLeftColor: "#D4AF37",
+  },
+  description: {
+    fontSize: 14,
+    lineHeight: 20,
+    fontStyle: "italic",
+  },
   typeRow: {
     flexGrow: 0,
     minHeight: 35,
     marginTop: 16,
     marginBottom: 16,
   },
-  addIcon: {
-    flex: 1,
-    position: "absolute",
+  cardFooter: {
     flexDirection: "row",
-    right: 20,
-    paddingRight: 20,
-    top: 50,
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 4,
+    borderTopWidth: 1,
+    borderTopColor: "rgba(212, 175, 55, 0.2)",
+    paddingTop: 12,
+  },
+  actionButton: {
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 12,
+  },
+  addIcon: {
     backgroundColor: Colors.primary,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
   },
   done: {
-    flex: 1,
-    position: "absolute",
-    flexDirection: "row",
-    right: 20,
-    paddingRight: 20,
-    top: 50,
-    paddingVertical: 8,
-    paddingHorizontal: 20,
-    borderRadius: 20,
     borderColor: Colors.success,
     borderWidth: 1,
     backgroundColor: "rgba(16, 185, 129, 0.12)",
   },
   detailsButton: {
     flexDirection: "row",
-    alignItems: "center", // Centers the text and icon vertically
-    gap: 4, // Adds a little breathing room between text and icon
-    paddingVertical: 8, // Makes the touch target easier to tap
+    alignItems: "center",
+    gap: 4,
+    paddingVertical: 4,
   },
   headerRow: {
     flexDirection: "row",
     alignItems: "center",
-    justifyContent: "space-between", // Pushes Title to left, Icons to right
+    justifyContent: "space-between",
     paddingHorizontal: 16,
     marginTop: 10,
   },
   iconButtonContainer: {
     flexDirection: "row",
-    gap: 12, // Space between the two icons
+    gap: 8,
     alignItems: "center",
   },
   iconBtn: {
     flexDirection: "row",
     gap: 4,
     padding: 12,
-    borderRadius: 20, // Circular buttons
+    borderRadius: 20,
     backgroundColor: Colors.primary,
     alignItems: "center",
     justifyContent: "center",

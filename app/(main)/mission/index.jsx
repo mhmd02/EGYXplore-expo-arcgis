@@ -107,27 +107,33 @@ export default function Missions() {
         {visibleMissions.map((mission) => {
           const done = isCompleted(mission.id);
           return (
-            <Card key={mission.id} style={styles.card}>
-              <View style={styles.cardInfo}>
-                <Text style={[styles.cardName, { color: colorTheme.title }]}>
-                  {mission.title}
-                </Text>
-                <Text style={styles.cardPoints}>⭐ {mission.points} pts</Text>
-              </View>
-
-              {done ? (
-                <View style={styles.doneBadge}>
-                  <Text style={styles.doneBadgeText}>✓ Done</Text>
+            <TouchableOpacity
+              onPress={() => router.push(`/mission/${mission.id}`)}
+              key={mission.id}
+              disabled={done}
+            >
+              <Card key={mission.id} style={styles.card} variant="pharaonic">
+                <View style={styles.cardInfo}>
+                  <Text style={[styles.cardName, { color: colorTheme.title }]}>
+                    {mission.title}
+                  </Text>
+                  <Text style={styles.cardPoints}>⭐ {mission.points} pts</Text>
                 </View>
-              ) : (
-                <TouchableOpacity
-                  style={styles.goButton}
-                  onPress={() => router.push(`/mission/${mission.id}`)}
-                >
-                  <Text style={styles.goButtonText}>Go</Text>
-                </TouchableOpacity>
-              )}
-            </Card>
+
+                {done ? (
+                  <View style={styles.doneBadge}>
+                    <Text style={styles.doneBadgeText}>✓ Done</Text>
+                  </View>
+                ) : (
+                  <TouchableOpacity
+                    style={styles.goButton}
+                    onPress={() => router.push(`/mission/${mission.id}`)}
+                  >
+                    <Text style={styles.goButtonText}>Go</Text>
+                  </TouchableOpacity>
+                )}
+              </Card>
+            </TouchableOpacity>
           );
         })}
       </ScrollView>
