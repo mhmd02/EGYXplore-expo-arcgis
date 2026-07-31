@@ -1,14 +1,15 @@
 import {
-  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
-  TouchableWithoutFeedback,
   Text,
   View,
   TouchableOpacity,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
 import { useContext, useMemo, useState } from "react";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+
 
 import { ThemeContext } from "../../context/ThemeContext";
 import ThemedTextInput from "../../components/ThemedTextInput";
@@ -30,7 +31,7 @@ export default function Register() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  const { updateUser, register } = useUser();
+  const { register } = useUser();
   const [submitError, setSubmitError] = useState(null);
   const {
     profileImage,
@@ -65,7 +66,6 @@ export default function Register() {
   const onSubmit = async (data) => {
     try {
       await register(data);
-      updateUser({ profileImage });
       router.push("/step1");
     } catch (err) {
       setSubmitError(err.message);
@@ -74,17 +74,19 @@ export default function Register() {
 
   return (
     <ThemedView style={styles.container} safe={true}>
-      <KeyboardAwareScrollView
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          paddingHorizontal: 24,
-          paddingVertical: 20,
-        }}
-        enableOnAndroid={true}
-        keyboardShouldPersistTaps="handled"
-        extraScrollHeight={60}
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
+        keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
       >
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingHorizontal: 24,
+            paddingVertical: 20,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
         <Spacer height={5} />
         <View style={{ flexDirection: "row", width: "100%", gap: 10 }}>
           <View style={{ flex: 1 }}>
@@ -284,7 +286,8 @@ export default function Register() {
             Log in
           </Link>
         </View>
-      </KeyboardAwareScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

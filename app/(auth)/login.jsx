@@ -1,7 +1,8 @@
 import {
-  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
+  ScrollView,
   StyleSheet,
-  TouchableWithoutFeedback,
   Text,
 } from "react-native";
 import { Link, useRouter } from "expo-router";
@@ -14,7 +15,7 @@ import ThemedButton from "../../components/ThemedButton";
 import Spacer from "../../components/Spacer";
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+
 import { loginSchema } from "../../schema/authSchema";
 import { Controller, useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
@@ -49,17 +50,19 @@ export default function Login() {
   };
   return (
     <ThemedView style={styles.container}>
-      <KeyboardAwareScrollView
+      <KeyboardAvoidingView
         style={{ flex: 1 }}
-        contentContainerStyle={{
-          flexGrow: 1,
-          justifyContent: "center",
-          alignItems: "stretch",
-          paddingHorizontal: 24,
-        }}
-        enableOnAndroid={true}
-        keyboardShouldPersistTaps="handled"
+        behavior={Platform.OS === "ios" ? "padding" : "height"}
       >
+        <ScrollView
+          contentContainerStyle={{
+            flexGrow: 1,
+            justifyContent: "center",
+            alignItems: "stretch",
+            paddingHorizontal: 24,
+          }}
+          keyboardShouldPersistTaps="handled"
+        >
         <Spacer />
         <Controller
           control={control}
@@ -110,7 +113,8 @@ export default function Login() {
         >
           Register
         </Link>
-      </KeyboardAwareScrollView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </ThemedView>
   );
 }

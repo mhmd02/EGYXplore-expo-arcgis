@@ -88,7 +88,7 @@ export default function MainLayout() {
               <Ionicons
                 name={focused ? "map" : "map-outline"}
                 size={24}
-                color={colorTheme.title}
+                color={color}
               />
             ),
           }}

@@ -1,17 +1,23 @@
-import React, { useContext, useMemo, useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
+import { useContext, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 
 import ThemedView from "../../components/ThemedView";
 import ThemedText from "../../components/ThemedText";
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
 
-import { takePhoto, pickImageFromGallery } from "../../constants/pickImages";
 import { useUser } from "../../context/UserContext";
 import { UriContext } from "../../context/UriContext";
 import CustomAlert from "../../components/CustomAlert";
+import { uploadProfilePicture } from "../../api/profileApi";
 
 export default function Step2() {
   const router = useRouter();
@@ -27,14 +33,32 @@ export default function Step2() {
 
   const { theme } = useContext(ThemeContext);
 
-  const { updateUser } = useUser();
+  const { token, updateUser } = useUser();
+  const [uploading, setUploading] = useState(false);
+  const [uploadError, setUploadError] = useState(null);
 
   const colorTheme = Colors[theme] || Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  const imageName = profileImage
-    ? profileImage.split("/").pop()
-    : "Selected image";
+  const handleFinish = async () => {
+    if (!profileImage) {
+      router.replace("/explore");
+      return;
+    }
+
+    setUploading(true);
+    setUploadError(null);
+    try {
+      const result = await uploadProfilePicture(token, profileImage);
+      await updateUser({ profilePictureUrl: result.profilePictureUrl });
+      setProfileImage(null);
+      router.replace("/explore");
+    } catch (err) {
+      setUploadError(err.message || "Could not upload profile picture.");
+    } finally {
+      setUploading(false);
+    }
+  };
 
   return (
     <ThemedView style={styles.container} safe={true}>
@@ -56,6 +80,7 @@ export default function Step2() {
         <TouchableOpacity
           style={styles.avatarContainer}
           onPress={() => setAlertVisible(true)}
+          disabled={uploading}
         >
           {profileImage ? (
             <Image source={{ uri: profileImage }} style={styles.avatarImage} />
@@ -74,23 +99,27 @@ export default function Step2() {
         onChooseGallery={handleChooseGallery}
         colorTheme={colorTheme}
       />
+      {uploadError && <Text style={styles.errorText}>{uploadError}</Text>}
       <View style={styles.buttonRowContainer}>
         <TouchableOpacity
           style={styles.linkButtonAlternative}
           onPress={() => router.back()}
+          disabled={uploading}
         >
           <Text style={{ color: colorTheme.text, fontWeight: "500" }}>
             Back
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={styles.linkButton}
-          onPress={() => {
-            updateUser({ avatar: profileImage });
-            router.replace("/explore");
-          }}
+          style={[styles.linkButton, uploading && styles.disabledButton]}
+          onPress={handleFinish}
+          disabled={uploading}
         >
-          <Text style={{ color: "#FFF", fontWeight: "bold" }}>Finish</Text>
+          {uploading ? (
+            <ActivityIndicator color="#FFF" />
+          ) : (
+            <Text style={{ color: "#FFF", fontWeight: "bold" }}>Finish</Text>
+          )}
         </TouchableOpacity>
       </View>
     </ThemedView>
@@ -148,5 +177,12 @@ const createStyles = (colorTheme) =>
       paddingHorizontal: 32,
       borderRadius: 25,
     },
+    disabledButton: { opacity: 0.65 },
     linkButtonAlternative: { paddingVertical: 14, paddingHorizontal: 20 },
+    errorText: {
+      color: Colors.danger ?? "#DC2626",
+      fontSize: 13,
+      marginBottom: 12,
+      textAlign: "center",
+    },
   });

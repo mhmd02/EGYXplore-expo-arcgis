@@ -169,7 +169,6 @@ export default function Trips() {
         styles.container,
         {
           backgroundColor: colorTheme.background,
-          marginBottom: tabBarClearance,
         },
       ]}
     >
@@ -207,6 +206,7 @@ export default function Trips() {
         <FlatList
           data={visibleTrips}
           keyExtractor={(item) => item.id.toString()}
+          style={{ marginBottom: tabBarClearance }}
           contentContainerStyle={styles.list}
           renderItem={renderItems}
           showsVerticalScrollIndicator={false}
