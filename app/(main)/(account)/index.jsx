@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -26,6 +26,11 @@ export default function Account() {
   const { totalPoints, redeemedIds } = useProgress();
   const { user, updateUser, logout } = useUser();
   const [helpVisible, setHelpVisible] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.profilePictureUrl]);
 
   if (!user) {
     return null; // or a loading spinner, or redirect — see note below
@@ -70,8 +75,12 @@ export default function Account() {
       >
         {/* Header card: avatar + name + email + points */}
         <View style={styles.headerCard}>
-          {user.avatar ? (
-            <Image source={{ uri: user.avatar }} style={styles.avatar} />
+          {user.profilePictureUrl && !avatarLoadFailed ? (
+            <Image
+              source={{ uri: user.profilePictureUrl }}
+              style={styles.avatar}
+              onError={() => setAvatarLoadFailed(true)}
+            />
           ) : (
             <View style={styles.avatarFallback}>
               <ThemedText style={styles.avatarInitials}>{initials}</ThemedText>
