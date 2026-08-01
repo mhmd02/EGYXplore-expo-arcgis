@@ -50,7 +50,10 @@ export function UserProvider({ children }) {
     setToken(null);
     setIsLoading(false);
     await SecureStore.deleteItemAsync("token");
+    await SecureStore.deleteItemAsync("user");
+    await SecureStore.deleteItemAsync("profileImage");
   };
+
   const updateUser = (patch) => setUser((prev) => ({ ...prev, ...patch }));
   return (
     <UserContext.Provider

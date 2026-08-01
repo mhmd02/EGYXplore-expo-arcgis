@@ -9,6 +9,11 @@ import {
 import { Link, useRouter } from "expo-router";
 import { useContext, useMemo, useState } from "react";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { Ionicons } from "@expo/vector-icons";
+import { registerSchema } from "../../schema/authSchema";
+import { useForm, Controller } from "react-hook-form";
+import { zodResolver } from "@hookform/resolvers/zod";
+import * as FileSystem from "expo-file-system";
 
 import { ThemeContext } from "../../context/ThemeContext";
 import ThemedTextInput from "../../components/ThemedTextInput";
@@ -18,12 +23,7 @@ import ThemedButton from "../../components/ThemedButton";
 import Spacer from "../../components/Spacer";
 import { Colors } from "../../constants/Colors";
 import { useUser } from "../../context/UserContext";
-import { UriContext } from "../../context/UriContext";
-import CustomAlert from "../../components/CustomAlert";
-import { Ionicons } from "@expo/vector-icons";
-import { registerSchema } from "../../schema/authSchema";
-import { useForm, Controller } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
+
 export default function Register() {
   const router = useRouter();
   const { theme, setTheme } = useContext(ThemeContext);
@@ -32,14 +32,7 @@ export default function Register() {
 
   const { updateUser, register } = useUser();
   const [submitError, setSubmitError] = useState(null);
-  const {
-    profileImage,
-    setProfileImage,
-    alertVisible,
-    setAlertVisible,
-    handleTakePhoto,
-    handleChooseGallery,
-  } = useContext(UriContext);
+
   const {
     control,
     handleSubmit,
@@ -58,14 +51,9 @@ export default function Register() {
     },
   });
 
-  const imageName = profileImage
-    ? profileImage.split("/").pop()
-    : "Selected image";
-
   const onSubmit = async (data) => {
     try {
       await register(data);
-      updateUser({ profileImage });
       router.push("/step1");
     } catch (err) {
       setSubmitError(err.message);
@@ -222,51 +210,6 @@ export default function Register() {
         />
         {errors.country && (
           <Text style={styles.errorText}>{errors.country.message}</Text>
-        )}
-        <View style={styles.imageUploadField}>
-          <TouchableOpacity
-            style={{ flex: 1, flexDirection: "row", alignItems: "center" }}
-            onPress={() => setAlertVisible(true)}
-          >
-            {profileImage ? (
-              <Text
-                style={{ color: colorTheme.text }}
-                numberOfLines={1}
-                ellipsizeMode="middle"
-              >
-                {imageName}
-              </Text>
-            ) : (
-              <>
-                <Ionicons
-                  name="image-outline"
-                  size={20}
-                  color={colorTheme.placeholder}
-                  style={{ marginRight: 8 }}
-                />
-                <Text style={{ color: colorTheme.placeholder }}>
-                  Choose Photo
-                </Text>
-              </>
-            )}
-          </TouchableOpacity>
-          {profileImage ? (
-            <TouchableOpacity
-              onPress={() => setProfileImage("")}
-              style={styles.removeImageButton}
-            >
-              <Text style={styles.removeImageText}>✕</Text>
-            </TouchableOpacity>
-          ) : null}
-        </View>
-        {alertVisible && (
-          <CustomAlert
-            visible={alertVisible}
-            onClose={() => setAlertVisible(false)}
-            onTakePhoto={handleTakePhoto}
-            onChooseGallery={handleChooseGallery}
-            colorTheme={colorTheme}
-          />
         )}
         <Spacer height={12} />
         <View>

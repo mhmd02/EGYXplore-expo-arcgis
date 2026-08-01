@@ -169,7 +169,7 @@ export default function Trips() {
         styles.container,
         {
           backgroundColor: colorTheme.background,
-          marginBottom: tabBarClearance,
+          paddingBottom: tabBarClearance,
         },
       ]}
     >

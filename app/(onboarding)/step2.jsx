@@ -3,12 +3,12 @@ import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
 import { useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 
-import ThemedView from "../../components/ThemedView";
-import ThemedText from "../../components/ThemedText";
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
 
-import { takePhoto, pickImageFromGallery } from "../../constants/pickImages";
+import ThemedView from "../../components/ThemedView";
+import ThemedText from "../../components/ThemedText";
+import CustomThemedLoader from "../../components/CustomThemedLoader";
 import { useUser } from "../../context/UserContext";
 import { UriContext } from "../../context/UriContext";
 import CustomAlert from "../../components/CustomAlert";
@@ -17,24 +17,28 @@ export default function Step2() {
   const router = useRouter();
 
   const {
-    profileImage,
-    setProfileImage,
     alertVisible,
     setAlertVisible,
     handleTakePhoto,
     handleChooseGallery,
+    uploading,
   } = useContext(UriContext);
 
   const { theme } = useContext(ThemeContext);
 
-  const { updateUser } = useUser();
+  const { user, updateUser } = useUser();
 
   const colorTheme = Colors[theme] || Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  const imageName = profileImage
-    ? profileImage.split("/").pop()
-    : "Selected image";
+  if (uploading) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <CustomThemedLoader />
+        <ThemedText style={styles.statusText}>Uploading...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container} safe={true}>
@@ -57,8 +61,11 @@ export default function Step2() {
           style={styles.avatarContainer}
           onPress={() => setAlertVisible(true)}
         >
-          {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+          {user.profilePicturePath ? (
+            <Image
+              source={{ uri: user.profilePicturePath }}
+              style={styles.avatarImage}
+            />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={{ fontSize: 40 }}>👤</Text>
@@ -86,7 +93,6 @@ export default function Step2() {
         <TouchableOpacity
           style={styles.linkButton}
           onPress={() => {
-            updateUser({ avatar: profileImage });
             router.replace("/explore");
           }}
         >
@@ -100,6 +106,17 @@ export default function Step2() {
 const createStyles = (colorTheme) =>
   StyleSheet.create({
     container: { flex: 1, paddingHorizontal: 24 },
+    centered: {
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    statusText: {
+      fontSize: 16,
+      fontWeight: "600",
+      marginTop: 12,
+      textAlign: "center",
+    },
     stepText: {
       color: colorTheme.text,
       fontSize: 12,

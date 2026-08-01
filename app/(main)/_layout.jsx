@@ -12,12 +12,19 @@ import { ThemeContext } from "../../context/ThemeContext";
 import { SettingsContext } from "../../context/SettingsContext";
 import { useUser } from "../../context/UserContext";
 import CustomThemedLoader from "../../components/CustomThemedLoader";
-import ContentProvider from "../../context/ContentContext";
+import ContentProvider, { ContentContext } from "../../context/ContentContext";
 
 export default function MainLayout() {
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
-  const { missionAlerts, rewardAlerts } = useContext(SettingsContext);
+  const {
+    newMission,
+    newReward,
+    setNewMission,
+    setNewReward,
+    allowMissionsNotifications,
+    allowRewardsNotifications,
+  } = useContext(ContentContext);
 
   const insets = useSafeAreaInsets();
   const { token, user, isLoading } = useUser();
@@ -104,9 +111,14 @@ export default function MainLayout() {
                   size={24}
                   color={color}
                 />
-                {missionAlerts && <View style={styles.badgeDot} />}
+                {allowMissionsNotifications && newMission && (
+                  <View style={styles.badgeDot} />
+                )}
               </View>
             ),
+          }}
+          listeners={{
+            tabPress: () => setNewMission(false),
           }}
         />
         <Tabs.Screen
@@ -120,9 +132,14 @@ export default function MainLayout() {
                   size={24}
                   color={color}
                 />
-                {rewardAlerts && <View style={styles.badgeDot} />}
+                {allowRewardsNotifications && newReward && (
+                  <View style={styles.badgeDot} />
+                )}
               </View>
             ),
+          }}
+          listeners={{
+            tabPress: () => setNewReward(false),
           }}
         />
         <Tabs.Screen
