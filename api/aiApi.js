@@ -1,61 +1,39 @@
-import * as SecureStore from "expo-secure-store";
 import { File } from "expo-file-system";
-
-let inMemoryToken = null;
-
-export async function getToken() {
-  if (inMemoryToken) return inMemoryToken;
-  try {
-    inMemoryToken = await SecureStore.getItemAsync("token");
-  } catch {
-    inMemoryToken = null;
-  }
-  return inMemoryToken;
-}
-
-export async function logout() {
-  inMemoryToken = null;
-  try {
-    await SecureStore.deleteItemAsync("token");
-  } catch {}
-}
-
-export async function login(email, password) {
-  const res = await fetch(`${API_BASE}/api/auth/login`, {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      "ngrok-skip-browser-warning": "true",
-    },
-    body: JSON.stringify({ email, password }),
-  });
-
-  if (!res.ok) {
-    const err = await res.json().catch(() => ({ error: "Login failed" }));
-    throw new Error(err.error || "Login failed");
-  }
-
-  const data = await res.json();
-  inMemoryToken = data.token;
-  try {
-    await SecureStore.setItemAsync("token", data.token);
-  } catch {}
-  return data;
-}
 
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "http://localhost:5217";
 
+export class AiAuthenticationError extends Error {
+  constructor(message = "Your session has expired. Please log in again.") {
+    super(message);
+    this.name = "AiAuthenticationError";
+  }
+}
+
+function getAuthorizationHeaders(token) {
+  if (!token) {
+    throw new AiAuthenticationError("Please log in to use the AI assistant.");
+  }
+
+  return { Authorization: `Bearer ${token}` };
+}
+
+function throwIfUnauthorized(response) {
+  if (response.status === 401) {
+    throw new AiAuthenticationError();
+  }
+}
+
 export async function sendChatMessage(
+  token,
   message,
   history = [],
   images = [],
   audioUri = null,
   chatSessionId = null,
 ) {
-  const token = await getToken();
   const headers = {
     "ngrok-skip-browser-warning": "true",
-    ...(token ? { Authorization: `Bearer ${token}` } : {}),
+    ...getAuthorizationHeaders(token),
   };
 
   const formData = new FormData();
@@ -98,10 +76,7 @@ export async function sendChatMessage(
     body: formData,
   });
 
-  if (res.status === 401) {
-    await logout();
-    throw new Error("Session expired. Please log in again.");
-  }
+  throwIfUnauthorized(res);
 
   if (!res.ok) {
     const errorText = await res.text().catch(() => "(unreadable)");
@@ -112,24 +87,29 @@ export async function sendChatMessage(
   return res.json();
 }
 
-export async function getHistory() {
-  const token = await getToken();
+export async function getHistory(token) {
   const res = await fetch(`${API_BASE}/AiChat/GetHistory`, {
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...getAuthorizationHeaders(token),
     },
   });
-  if (!res.ok) return [];
+  throwIfUnauthorized(res);
+  if (!res.ok) {
+    throw new Error(`Failed to load chat history: ${res.status}`);
+  }
   return res.json();
 }
 
-export async function getHistorySession(id) {
-  const token = await getToken();
+export async function getHistorySession(token, id) {
   const res = await fetch(`${API_BASE}/AiChat/GetHistorySession?id=${id}`, {
     headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      ...getAuthorizationHeaders(token),
     },
   });
-  if (!res.ok) return null;
+  throwIfUnauthorized(res);
+  if (res.status === 404) return null;
+  if (!res.ok) {
+    throw new Error(`Failed to load chat session: ${res.status}`);
+  }
   return res.json();
 }

@@ -1,7 +1,13 @@
-import React, { useContext, useMemo, useState } from "react";
-import { StyleSheet, Text, View, TouchableOpacity, Image } from "react-native";
+import { useContext, useMemo, useState } from "react";
+import {
+  ActivityIndicator,
+  Image,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { useRouter } from "expo-router";
-import * as ImagePicker from "expo-image-picker";
 
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
@@ -12,6 +18,7 @@ import CustomThemedLoader from "../../components/CustomThemedLoader";
 import { useUser } from "../../context/UserContext";
 import { UriContext } from "../../context/UriContext";
 import CustomAlert from "../../components/CustomAlert";
+import { uploadProfilePicture } from "../../api/profileApi";
 
 export default function Step2() {
   const router = useRouter();
@@ -60,6 +67,7 @@ export default function Step2() {
         <TouchableOpacity
           style={styles.avatarContainer}
           onPress={() => setAlertVisible(true)}
+          disabled={uploading}
         >
           {user.profilePicturePath ? (
             <Image
@@ -81,10 +89,12 @@ export default function Step2() {
         onChooseGallery={handleChooseGallery}
         colorTheme={colorTheme}
       />
+      {uploadError && <Text style={styles.errorText}>{uploadError}</Text>}
       <View style={styles.buttonRowContainer}>
         <TouchableOpacity
           style={styles.linkButtonAlternative}
           onPress={() => router.back()}
+          disabled={uploading}
         >
           <Text style={{ color: colorTheme.text, fontWeight: "500" }}>
             Back
@@ -165,5 +175,12 @@ const createStyles = (colorTheme) =>
       paddingHorizontal: 32,
       borderRadius: 25,
     },
+    disabledButton: { opacity: 0.65 },
     linkButtonAlternative: { paddingVertical: 14, paddingHorizontal: 20 },
+    errorText: {
+      color: Colors.danger ?? "#DC2626",
+      fontSize: 13,
+      marginBottom: 12,
+      textAlign: "center",
+    },
   });

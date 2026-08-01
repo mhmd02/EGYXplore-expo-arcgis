@@ -1,4 +1,4 @@
-import { useContext, useMemo, useState } from "react";
+import { useContext, useEffect, useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -35,6 +35,11 @@ export default function Account() {
   } = useContext(UriContext);
 
   const [helpVisible, setHelpVisible] = useState(false);
+  const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
+
+  useEffect(() => {
+    setAvatarLoadFailed(false);
+  }, [user?.profilePictureUrl]);
 
   if (!user) {
     return null;

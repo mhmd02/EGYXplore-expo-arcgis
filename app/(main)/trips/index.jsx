@@ -207,6 +207,7 @@ export default function Trips() {
         <FlatList
           data={visibleTrips}
           keyExtractor={(item) => item.id.toString()}
+          style={{ marginBottom: tabBarClearance }}
           contentContainerStyle={styles.list}
           renderItem={renderItems}
           showsVerticalScrollIndicator={false}

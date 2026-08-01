@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { loginUser, registerUser } from "../api/authApi";
 import * as SecureStore from "expo-secure-store";
 
@@ -8,6 +8,7 @@ export function UserProvider({ children }) {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
   const [isLoading, setIsLoading] = useState(true);
+  const userRef = useRef(null);
 
   useEffect(() => {
     const restoreSession = async () => {
@@ -15,8 +16,10 @@ export function UserProvider({ children }) {
         const storedToken = await SecureStore.getItemAsync("token");
         const storedUser = await SecureStore.getItemAsync("user");
         if (storedToken && storedUser) {
+          const restoredUser = JSON.parse(storedUser);
           setToken(storedToken);
-          setUser(JSON.parse(storedUser));
+          setUser(restoredUser);
+          userRef.current = restoredUser;
         }
       } catch (err) {
         console.error("Failed to restore session:", err);
@@ -29,6 +32,7 @@ export function UserProvider({ children }) {
 
   const login = async (credentials) => {
     const result = await loginUser(credentials);
+    userRef.current = result.user;
     setUser(result.user);
     setToken(result.token);
     await SecureStore.setItemAsync("token", result.token);
@@ -38,6 +42,7 @@ export function UserProvider({ children }) {
 
   const register = async (data) => {
     const result = await registerUser(data);
+    userRef.current = result.user;
     setUser(result.user);
     setToken(result.token);
     await SecureStore.setItemAsync("token", result.token);
@@ -46,6 +51,7 @@ export function UserProvider({ children }) {
   };
 
   const logout = async () => {
+    userRef.current = null;
     setUser(null);
     setToken(null);
     setIsLoading(false);
