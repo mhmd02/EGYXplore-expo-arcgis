@@ -9,11 +9,12 @@ import {
 } from "react-native";
 import { useRouter } from "expo-router";
 
-import ThemedView from "../../components/ThemedView";
-import ThemedText from "../../components/ThemedText";
 import { Colors } from "../../constants/Colors";
 import { ThemeContext } from "../../context/ThemeContext";
 
+import ThemedView from "../../components/ThemedView";
+import ThemedText from "../../components/ThemedText";
+import CustomThemedLoader from "../../components/CustomThemedLoader";
 import { useUser } from "../../context/UserContext";
 import { UriContext } from "../../context/UriContext";
 import CustomAlert from "../../components/CustomAlert";
@@ -23,42 +24,28 @@ export default function Step2() {
   const router = useRouter();
 
   const {
-    profileImage,
-    setProfileImage,
     alertVisible,
     setAlertVisible,
     handleTakePhoto,
     handleChooseGallery,
+    uploading,
   } = useContext(UriContext);
 
   const { theme } = useContext(ThemeContext);
 
-  const { token, updateUser } = useUser();
-  const [uploading, setUploading] = useState(false);
-  const [uploadError, setUploadError] = useState(null);
+  const { user, updateUser } = useUser();
 
   const colorTheme = Colors[theme] || Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  const handleFinish = async () => {
-    if (!profileImage) {
-      router.replace("/explore");
-      return;
-    }
-
-    setUploading(true);
-    setUploadError(null);
-    try {
-      const result = await uploadProfilePicture(token, profileImage);
-      await updateUser({ profilePictureUrl: result.profilePictureUrl });
-      setProfileImage(null);
-      router.replace("/explore");
-    } catch (err) {
-      setUploadError(err.message || "Could not upload profile picture.");
-    } finally {
-      setUploading(false);
-    }
-  };
+  if (uploading) {
+    return (
+      <ThemedView safe={true} style={[styles.container, styles.centered]}>
+        <CustomThemedLoader />
+        <ThemedText style={styles.statusText}>Uploading...</ThemedText>
+      </ThemedView>
+    );
+  }
 
   return (
     <ThemedView style={styles.container} safe={true}>
@@ -82,8 +69,11 @@ export default function Step2() {
           onPress={() => setAlertVisible(true)}
           disabled={uploading}
         >
-          {profileImage ? (
-            <Image source={{ uri: profileImage }} style={styles.avatarImage} />
+          {user.profilePicturePath ? (
+            <Image
+              source={{ uri: user.profilePicturePath }}
+              style={styles.avatarImage}
+            />
           ) : (
             <View style={styles.avatarPlaceholder}>
               <Text style={{ fontSize: 40 }}>👤</Text>
@@ -111,15 +101,12 @@ export default function Step2() {
           </Text>
         </TouchableOpacity>
         <TouchableOpacity
-          style={[styles.linkButton, uploading && styles.disabledButton]}
-          onPress={handleFinish}
-          disabled={uploading}
+          style={styles.linkButton}
+          onPress={() => {
+            router.replace("/explore");
+          }}
         >
-          {uploading ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <Text style={{ color: "#FFF", fontWeight: "bold" }}>Finish</Text>
-          )}
+          <Text style={{ color: "#FFF", fontWeight: "bold" }}>Finish</Text>
         </TouchableOpacity>
       </View>
     </ThemedView>
@@ -129,6 +116,17 @@ export default function Step2() {
 const createStyles = (colorTheme) =>
   StyleSheet.create({
     container: { flex: 1, paddingHorizontal: 24 },
+    centered: {
+      justifyContent: "center",
+      alignItems: "center",
+      paddingHorizontal: 24,
+    },
+    statusText: {
+      fontSize: 16,
+      fontWeight: "600",
+      marginTop: 12,
+      textAlign: "center",
+    },
     stepText: {
       color: colorTheme.text,
       fontSize: 12,

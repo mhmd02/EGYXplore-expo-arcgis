@@ -86,7 +86,10 @@ export default function Rewards() {
     );
   }
   return (
-    <ThemedView safe={true} style={styles.container}>
+    <ThemedView
+      safe={true}
+      style={[styles.container, { paddingBottom: tabBarClearance }]}
+    >
       <View style={styles.headerRow}>
         <ThemedText title={true} style={styles.header}>
           Rewards
@@ -119,7 +122,7 @@ export default function Rewards() {
 
       {/* Reward cards */}
       <ScrollView
-        style={[styles.list, { marginBottom: tabBarClearance }]}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       >

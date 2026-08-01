@@ -83,7 +83,10 @@ export default function Missions() {
     );
   }
   return (
-    <ThemedView safe={true} style={styles.container}>
+    <ThemedView
+      safe={true}
+      style={[styles.container, { paddingBottom: tabBarClearance }]}
+    >
       <ThemedView style={styles.missionHeader}>
         <ThemedText title={true} style={styles.header}>
           Missions
@@ -100,7 +103,7 @@ export default function Missions() {
 
       {/* Mission cards */}
       <ScrollView
-        style={[styles.list, { marginBottom: tabBarClearance }]}
+        style={styles.list}
         contentContainerStyle={styles.listContent}
         showsVerticalScrollIndicator={false}
       >
@@ -184,7 +187,7 @@ const styles = StyleSheet.create({
   },
   listContent: {
     gap: 12,
-    paddingBottom: 12,
+    paddingBottom: 24,
   },
   card: {
     flexDirection: "row",

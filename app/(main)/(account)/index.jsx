@@ -13,10 +13,12 @@ import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../../../context/ThemeContext";
 import { useProgress } from "../../../context/ProgressContext";
 import { useUser } from "../../../context/UserContext";
+import { UriContext } from "../../../context/UriContext";
 import { Colors } from "../../../constants/Colors";
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
 import HelpModal from "../../../components/HelpModal";
+import CustomAlert from "../../../components/CustomAlert";
 
 export default function Account() {
   const { theme } = useContext(ThemeContext);
@@ -25,6 +27,13 @@ export default function Account() {
   const router = useRouter();
   const { totalPoints, redeemedIds } = useProgress();
   const { user, updateUser, logout } = useUser();
+  const {
+    alertVisible,
+    setAlertVisible,
+    handleTakePhoto,
+    handleChooseGallery,
+  } = useContext(UriContext);
+
   const [helpVisible, setHelpVisible] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 
@@ -33,7 +42,7 @@ export default function Account() {
   }, [user?.profilePictureUrl]);
 
   if (!user) {
-    return null; // or a loading spinner, or redirect — see note below
+    return null;
   }
 
   const fullName = `${user.firstName} ${user.lastName}`.trim();
@@ -75,22 +84,35 @@ export default function Account() {
       >
         {/* Header card: avatar + name + email + points */}
         <View style={styles.headerCard}>
-          {user.profilePictureUrl && !avatarLoadFailed ? (
-            <Image
-              source={{ uri: user.profilePictureUrl }}
-              style={styles.avatar}
-              onError={() => setAvatarLoadFailed(true)}
-            />
-          ) : (
-            <View style={styles.avatarFallback}>
-              <ThemedText style={styles.avatarInitials}>{initials}</ThemedText>
-            </View>
-          )}
-          <ThemedText title={true} style={styles.name}>
-            {fullName}
-          </ThemedText>
-          <ThemedText style={styles.email}>{user.email}</ThemedText>
-
+          <TouchableOpacity
+            activeOpacity={0.8}
+            onPress={() => setAlertVisible(true)}
+            style={{ alignItems: "center" }}
+          >
+            {user.profilePicturePath ? (
+              <Image
+                source={{ uri: user.profilePicturePath }}
+                style={styles.avatar}
+              />
+            ) : (
+              <View style={styles.avatarFallback}>
+                <ThemedText style={styles.avatarInitials}>
+                  {initials}
+                </ThemedText>
+              </View>
+            )}
+            <ThemedText title={true} style={styles.name}>
+              {fullName}
+            </ThemedText>
+            <ThemedText style={styles.email}>{user.email}</ThemedText>
+          </TouchableOpacity>
+          <CustomAlert
+            visible={alertVisible}
+            onClose={() => setAlertVisible(false)}
+            onTakePhoto={handleTakePhoto}
+            onChooseGallery={handleChooseGallery}
+            colorTheme={colorTheme}
+          />
           {/* Points earned across missions (from ProgressContext) */}
           <View style={styles.pointsPill}>
             <ThemedText style={styles.pointsText}>
