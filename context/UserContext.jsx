@@ -55,12 +55,26 @@ export function UserProvider({ children }) {
     setUser(null);
     setToken(null);
     setIsLoading(false);
-    await SecureStore.deleteItemAsync("token");
-    await SecureStore.deleteItemAsync("user");
-    await SecureStore.deleteItemAsync("profileImage");
+    await Promise.all([
+      SecureStore.deleteItemAsync("token"),
+      SecureStore.deleteItemAsync("user"),
+    ]);
   };
+  const updateUser = async (patch) => {
+    if (!userRef.current) return null;
 
-  const updateUser = (patch) => setUser((prev) => ({ ...prev, ...patch }));
+    const updatedUser = { ...userRef.current, ...patch };
+    userRef.current = updatedUser;
+    setUser(updatedUser);
+
+    try {
+      await SecureStore.setItemAsync("user", JSON.stringify(updatedUser));
+    } catch (err) {
+      console.error("Failed to persist user changes:", err);
+    }
+
+    return updatedUser;
+  };
   return (
     <UserContext.Provider
       value={{ user, token, login, register, logout, updateUser, isLoading }}

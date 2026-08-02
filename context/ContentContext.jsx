@@ -1,8 +1,6 @@
 import { useState, useEffect, createContext } from "react";
 import { getMissions, getRewards, getDestinations } from "../api/contentApi";
 import { useUser } from "../context/UserContext";
-import { useNotificationHub } from "../context/useNotificationsHub";
-
 export const ContentContext = createContext();
 
 export default function ContentProvider({ children }) {
@@ -12,14 +10,8 @@ export default function ContentProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const { token, isLoading: userLoading } = useUser();
-  const [newMission, setNewMission] = useState(null);
-  const [newReward, setNewReward] = useState(null);
-  const [allowMissionsNotifications, setAllowMissionsNotifications] =
-    useState(true);
-  const [allowRewardsNotifications, setAllowRewardsNotifications] =
-    useState(true);
 
-  const fetchData = async ({ silent = false } = {}) => {
+  const fetchData = async () => {
     if (!token) {
       setMissions(null);
       setRewards(null);
@@ -27,7 +19,7 @@ export default function ContentProvider({ children }) {
       setLoading(false);
       return;
     }
-    if (!silent) setLoading(true);
+    setLoading(true);
     setError(null);
     try {
       const [missionsResult, rewardsResult, destinationsResult] =
@@ -63,7 +55,7 @@ export default function ContentProvider({ children }) {
         setError("Failed to load content.");
       }
     } finally {
-      if (!silent) setLoading(false);
+      setLoading(false);
     }
   };
 
@@ -74,38 +66,6 @@ export default function ContentProvider({ children }) {
     fetchData();
   }, [token, userLoading]);
 
-  useNotificationHub(token, {
-    MissionAdded: (mission) => {
-      setMissions((prev) => (prev ? [...prev, mission] : [mission]));
-      setNewMission(true);
-    },
-    MissionUpdated: (updatedMission) => {
-      setMissions((prev) =>
-        prev
-          ? prev.map((m) => (m.id === updatedMission.id ? updatedMission : m))
-          : [updatedMission],
-      );
-    },
-    MissionDeleted: (id) => {
-      setMissions((prev) => (prev ? prev.filter((m) => m.id !== id) : []));
-    },
-    RewardAdded: (reward) => {
-      setRewards((prev) => (prev ? [...prev, reward] : [reward]));
-      setNewReward(true);
-    },
-    RewardUpdated: (updatedReward) => {
-      setRewards((prev) =>
-        prev
-          ? prev.map((r) => (r.id === updatedReward.id ? updatedReward : r))
-          : [updatedReward],
-      );
-    },
-    RewardDeleted: (id) => {
-      setRewards((prev) => (prev ? prev.filter((m) => m.id !== id) : []));
-    },
-    onReconnected: () => fetchData({ silent: true }),
-  });
-
   return (
     <ContentContext.Provider
       value={{
@@ -115,14 +75,6 @@ export default function ContentProvider({ children }) {
         loading,
         error,
         refetch: fetchData,
-        newMission,
-        setNewMission,
-        newReward,
-        setNewReward,
-        allowMissionsNotifications,
-        setAllowMissionsNotifications,
-        allowRewardsNotifications,
-        setAllowRewardsNotifications,
       }}
     >
       {children}
