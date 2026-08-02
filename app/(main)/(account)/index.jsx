@@ -24,7 +24,7 @@ export default function Account() {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const router = useRouter();
   const { totalPoints, redeemedIds } = useProgress();
-  const { user, updateUser, logout } = useUser();
+  const { user, logout } = useUser();
   const [helpVisible, setHelpVisible] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
 

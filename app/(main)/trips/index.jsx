@@ -55,7 +55,7 @@ export default function Trips() {
     return (
       <ThemedView safe={true} style={[styles.container, styles.centered]}>
         <CustomThemedLoader />
-        <ThemedText style={styles.statusText}>
+        <ThemedText style={styles.loadingText}>
           Loading destinations...
         </ThemedText>
       </ThemedView>
@@ -74,7 +74,7 @@ export default function Trips() {
   if (!destinations || destinations.length === 0) {
     return (
       <ThemedView safe={true} style={[styles.container, styles.centered]}>
-        <ThemedText style={styles.statusText}>
+        <ThemedText style={styles.badgeText}>
           No destinations available right now.
         </ThemedText>
       </ThemedView>
@@ -120,7 +120,7 @@ export default function Trips() {
             </View>
           )}
           <ThemedView style={styles.statusContainer}>
-            <ThemedText style={styles.statusText}>{item.status}</ThemedText>
+            <ThemedText style={styles.badgeText}>{item.status}</ThemedText>
           </ThemedView>
         </View>
         {/* Card Footer: Explore Link & Action Button in Flow Layout */}
@@ -206,8 +206,10 @@ export default function Trips() {
         <FlatList
           data={visibleTrips}
           keyExtractor={(item) => item.id.toString()}
-          style={{ marginBottom: tabBarClearance }}
-          contentContainerStyle={styles.list}
+          contentContainerStyle={[
+            styles.list,
+            { paddingBottom: tabBarClearance },
+          ]}
           renderItem={renderItems}
           showsVerticalScrollIndicator={false}
         />
@@ -220,16 +222,12 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  scrollContent: {
-    padding: 16,
-    paddingBottom: 120,
-  },
   centered: {
     justifyContent: "center",
     alignItems: "center",
     paddingHorizontal: 24,
   },
-  statusText: {
+  loadingText: {
     fontSize: 16,
     fontWeight: "600",
     marginTop: 12,
@@ -248,7 +246,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
   list: {
-    paddingBottom: 5,
+    paddingBottom: 75,
   },
   card: {
     marginHorizontal: 16,
@@ -295,7 +293,7 @@ const styles = StyleSheet.create({
     paddingVertical: 5,
     borderRadius: 6,
   },
-  statusText: {
+  badgeText: {
     fontSize: 11,
     fontWeight: "700",
     color: Colors.primary,

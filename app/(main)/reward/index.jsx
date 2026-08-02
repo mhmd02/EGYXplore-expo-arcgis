@@ -119,8 +119,11 @@ export default function Rewards() {
 
       {/* Reward cards */}
       <ScrollView
-        style={[styles.list, { marginBottom: tabBarClearance }]}
-        contentContainerStyle={styles.listContent}
+        style={styles.list}
+        contentContainerStyle={[
+          styles.listContent,
+          { paddingBottom: tabBarClearance },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         {visibleRewards.map((reward) => {
