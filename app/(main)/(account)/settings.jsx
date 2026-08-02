@@ -8,7 +8,7 @@ import {
   Alert,
 } from "react-native";
 import { ThemeContext } from "../../../context/ThemeContext";
-import { ContentContext } from "../../../context/ContentContext";
+import { SettingsContext } from "../../../context/SettingsContext";
 import { Colors } from "../../../constants/Colors";
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
@@ -21,13 +21,8 @@ export default function Settings() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
-  const {
-    allowMissionsNotifications,
-    setAllowMissionsNotifications,
-    allowRewardsNotifications,
-    setAllowRewardsNotifications,
-  } = useContext(ContentContext);
-
+  const { rewardAlerts, missionAlerts, setMissionAlerts, setRewardAlerts } =
+    useContext(SettingsContext);
   // Local settings state (in-memory for now — no persistence yet)
   const [language, setLanguage] = useState("English");
   const [currency, setCurrency] = useState("EGP");
@@ -157,8 +152,8 @@ export default function Settings() {
               </ThemedText>
             </View>
             <Switch
-              value={allowMissionsNotifications}
-              onValueChange={setAllowMissionsNotifications}
+              value={missionAlerts}
+              onValueChange={setMissionAlerts}
               trackColor={{ true: Colors.primary, false: colorTheme.border }}
               thumbColor="#fff"
             />
@@ -172,8 +167,8 @@ export default function Settings() {
               </ThemedText>
             </View>
             <Switch
-              value={allowRewardsNotifications}
-              onValueChange={setAllowRewardsNotifications}
+              value={rewardAlerts}
+              onValueChange={setRewardAlerts}
               trackColor={{ true: Colors.primary, false: colorTheme.border }}
               thumbColor="#fff"
             />
