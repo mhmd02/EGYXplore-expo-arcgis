@@ -9,13 +9,12 @@ import { useContext, useState, useMemo } from "react";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Colors } from "../../../constants/Colors";
-import { trips } from "../../../constants/trips";
 import { ThemeContext } from "../../../context/ThemeContext";
 import { ContentContext } from "../../../context/ContentContext";
+import { useTripDraft } from "../../../context/TripDraftContext";
 import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
 import Card from "../../../components/Card";
-import ThemedButton from "../../../components/ThemedButton";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import FilterChips from "../../../components/FilterChips";
 import { useTabBarClearance } from "../../../constants/layout";
@@ -25,18 +24,10 @@ export default function Trips() {
   const { destinations, loading, error } = useContext(ContentContext);
   const router = useRouter();
   const [selectedCategory, setSelectedCategory] = useState("All");
-  const [addedTripIds, setAddedTripIds] = useState([]);
+  const { isInDraft, toggleDraft, draftCount } = useTripDraft();
 
   const tabBarClearance = useTabBarClearance();
   const colorTheme = Colors[theme] ?? Colors.light;
-
-  const toggleAddTrip = (id) => {
-    setAddedTripIds((prevIds) =>
-      prevIds.includes(id)
-        ? prevIds.filter((tripId) => tripId !== id)
-        : [...prevIds, id],
-    );
-  };
 
   const destinationsTypes = useMemo(() => {
     if (loading || !destinations) return [];
@@ -82,7 +73,7 @@ export default function Trips() {
   }
 
   const renderItems = ({ item }) => {
-    const isAdded = addedTripIds.includes(item.id);
+    const isAdded = isInDraft(item.id);
 
     return (
       <Card style={styles.card} key={item.id} variant="pharaonic">
@@ -113,7 +104,7 @@ export default function Trips() {
           </ThemedText>
         </View>
         <View style={styles.cardTopRow}>
-          {item.rating && (
+          {item.rating != null && (
             <View style={styles.ratingBadge}>
               <Ionicons name="star" size={13} color="#D4AF37" />
               <Text style={styles.ratingText}>{item.rating}</Text>
@@ -145,7 +136,7 @@ export default function Trips() {
               styles.actionButton,
               isAdded ? styles.done : styles.addIcon,
             ]}
-            onPress={() => toggleAddTrip(item.id)}
+            onPress={() => toggleDraft(item.id)}
           >
             <Text
               style={{
@@ -182,17 +173,49 @@ export default function Trips() {
           </ThemedText>
 
           <View style={styles.iconButtonContainer}>
-            <TouchableOpacity style={styles.iconBtn}>
-              <Ionicons name="locate-outline" size={20} color="#fff" />
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push("/trips/create")}
+              accessibilityRole="button"
+              accessibilityLabel="Create trip"
+            >
+              <Ionicons
+                name="briefcase-outline"
+                size={24}
+                color={colorTheme.title}
+              />
+              {draftCount > 0 && (
+                <View style={styles.draftCountBadge}>
+                  <Text style={styles.draftCountText}>{draftCount}</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+
+            {/* Saved trips */}
+            <TouchableOpacity
+              style={styles.iconBtn}
+              onPress={() => router.push("/trips/my-trips")}
+              accessibilityRole="button"
+              accessibilityLabel="My saved trips"
+            >
+              <Ionicons
+                name="albums-outline"
+                size={24}
+                color={colorTheme.title}
+              />
             </TouchableOpacity>
 
             {/* AI Icon */}
             <TouchableOpacity
-              style={[styles.iconBtn, styles.aiBtn]}
+              style={styles.iconBtn}
               onPress={() => router.push("/trips/ai")}
             >
-              <Ionicons name="eye-outline" size={20} color="#fff" />
-              <Text style={[styles.iconBtnText, { color: "#fff" }]}>AI</Text>
+              <Ionicons
+                name="eye-outline"
+                size={24}
+                color={colorTheme.title}
+              />
+              <Text style={[styles.iconBtnText, { color: colorTheme.title }]}>AI</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -359,13 +382,33 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   iconBtn: {
+    position: "relative",
     flexDirection: "row",
     gap: 4,
-    padding: 12,
-    borderRadius: 20,
-    backgroundColor: Colors.primary,
+    paddingHorizontal: 8,
+    paddingVertical: 6,
     alignItems: "center",
     justifyContent: "center",
-    paddingVertical: 5,
+  },
+  iconBtnText: {
+    fontSize: 12,
+    fontWeight: "700",
+  },
+  draftCountBadge: {
+    position: "absolute",
+    top: -4,
+    right: 0,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: 4,
+    backgroundColor: Colors.danger ?? "#DC2626",
+  },
+  draftCountText: {
+    color: "#fff",
+    fontWeight: "800",
+    fontSize: 10,
   },
 });

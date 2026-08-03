@@ -69,6 +69,22 @@ export default function TripsStackLayout() {
           name="ai"
           options={{ title: "AI Assistant", headerBackTitle: "Back" }}
         />
+
+        {/* 3. The trip builder: review the draft picks + fill in the details */}
+        <Stack.Screen
+          name="create"
+          options={{ title: "Review Trip", headerBackTitle: "Back" }}
+        />
+
+        {/* 4. Saved trips list and one saved trip */}
+        <Stack.Screen
+          name="my-trips/index"
+          options={{ title: "My Trips", headerBackTitle: "Back" }}
+        />
+        <Stack.Screen
+          name="my-trips/[tripId]"
+          options={{ title: "Trip Details", headerBackTitle: "Back" }}
+        />
       </Stack>
     </>
   );
