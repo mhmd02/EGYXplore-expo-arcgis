@@ -76,7 +76,7 @@ const highlightLineSymbol = {
 const sanitizeSearchTerm = (input) => {
   if (!input) return "";
   // Only escape single quotes for SQL. Do not strip other characters!
-  return input.replace(/'/g, "''"); 
+  return input.replace(/'/g, "''");
 };
 
 export default function Explore() {
@@ -181,22 +181,39 @@ export default function Explore() {
       if (searchQuery.trim().length > 1 && showSuggestions) {
         const term = sanitizeSearchTerm(searchQuery.trim().toLowerCase());
         const whereClause = `LOWER(Name) LIKE '%${term}%'`;
-        
+
         let localSuggestions = [];
         try {
           if (destLayerRef.current) {
-            const destRes = await destLayerRef.current.queryFeatures({ whereClause });
-            if (destRes) localSuggestions.push(...destRes.map(f => ({ name: f.attributes.Name, type: "landmark" })));
+            const destRes = await destLayerRef.current.queryFeatures({
+              whereClause,
+            });
+            if (destRes)
+              localSuggestions.push(
+                ...destRes.map((f) => ({
+                  name: f.attributes.Name,
+                  type: "landmark",
+                })),
+              );
           }
           if (branchesLayerRef.current) {
-            const branchRes = await branchesLayerRef.current.queryFeatures({ whereClause });
-            if (branchRes) localSuggestions.push(...branchRes.map(f => ({ name: f.attributes.Name, type: "branch" })));
+            const branchRes = await branchesLayerRef.current.queryFeatures({
+              whereClause,
+            });
+            if (branchRes)
+              localSuggestions.push(
+                ...branchRes.map((f) => ({
+                  name: f.attributes.Name,
+                  type: "branch",
+                })),
+              );
           }
-          
+
           // Remove duplicates based on name
-          const unique = Array.from(new Set(localSuggestions.map(a => a.name)))
-            .map(name => localSuggestions.find(a => a.name === name));
-          
+          const unique = Array.from(
+            new Set(localSuggestions.map((a) => a.name)),
+          ).map((name) => localSuggestions.find((a) => a.name === name));
+
           setSuggestions(unique.slice(0, 5)); // limit to top 5 results
         } catch (e) {
           console.warn("Suggestion error:", e);
@@ -275,8 +292,9 @@ export default function Explore() {
 
   const handleSearch = async (overrideQuery = null) => {
     Keyboard.dismiss(); // Hides the keyboard
-    const queryToUse = typeof overrideQuery === 'string' ? overrideQuery : searchQuery;
-    
+    const queryToUse =
+      typeof overrideQuery === "string" ? overrideQuery : searchQuery;
+
     if (!queryToUse.trim()) return;
     if (isSearching) return; // Guard against double-submits while a search is in flight
     setIsSearching(true);
@@ -619,7 +637,10 @@ export default function Explore() {
                 ) : (
                   <TouchableOpacity
                     style={styles.iconButton}
-                    onPress={() => handleSearch(searchQuery)}
+                    onPress={() => {
+                      handleSearch(searchQuery);
+                      searchRef.current.focus();
+                    }}
                   >
                     <Ionicons name="search" size={20} color="#64748B" />
                   </TouchableOpacity>
@@ -629,67 +650,103 @@ export default function Explore() {
 
             {/* Suggestions Dropdown OR Filter Pills */}
             {showSuggestions && suggestions.length > 0 ? (
-              <View style={[styles.suggestionsDropdown, { backgroundColor: colorTheme.uiBackground, borderColor: colorTheme.border }]}>
+              <View
+                style={[
+                  styles.suggestionsDropdown,
+                  {
+                    backgroundColor: colorTheme.uiBackground,
+                    borderColor: colorTheme.border,
+                  },
+                ]}
+              >
                 {suggestions.map((item, index) => (
                   <TouchableOpacity
                     key={index}
-                    style={[styles.suggestionItem, index < suggestions.length - 1 && { borderBottomColor: colorTheme.border, borderBottomWidth: StyleSheet.hairlineWidth }]}
+                    style={[
+                      styles.suggestionItem,
+                      index < suggestions.length - 1 && {
+                        borderBottomColor: colorTheme.border,
+                        borderBottomWidth: StyleSheet.hairlineWidth,
+                      },
+                    ]}
                     onPress={() => {
                       setSearchQuery(item.name);
                       setShowSuggestions(false);
                       handleSearch(item.name);
                     }}
                   >
-                    <Ionicons name="location-outline" size={20} color={colorTheme.title} style={{ marginRight: 10 }} />
-                    <Text style={{ flex: 1, fontSize: 15, fontWeight: "500", color: colorTheme.text }}>{item.name}</Text>
-                    <Text style={{ fontSize: 12, opacity: 0.5, color: colorTheme.text }}>{item.type === 'landmark' ? 'Landmark' : 'Branch'}</Text>
+                    <Ionicons
+                      name="location-outline"
+                      size={20}
+                      color={colorTheme.title}
+                      style={{ marginRight: 10 }}
+                    />
+                    <Text
+                      style={{
+                        flex: 1,
+                        fontSize: 15,
+                        fontWeight: "500",
+                        color: colorTheme.text,
+                      }}
+                    >
+                      {item.name}
+                    </Text>
+                    <Text
+                      style={{
+                        fontSize: 12,
+                        opacity: 0.5,
+                        color: colorTheme.text,
+                      }}
+                    >
+                      {item.type === "landmark" ? "Landmark" : "Branch"}
+                    </Text>
                   </TouchableOpacity>
                 ))}
               </View>
             ) : (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles.filterContainer}
-              contentContainerStyle={styles.filterContent}
-            >
-              <TouchableOpacity
-                style={[
-                  styles.filterPill,
-                  showLandmarks && styles.filterPillActive,
-                  showLandmarks && {
-                    backgroundColor: colorTheme.mapDestination,
-                  },
-                ]}
-                onPress={() => setShowLandmarks(!showLandmarks)}
+              <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                style={styles.filterContainer}
+                contentContainerStyle={styles.filterContent}
               >
-                <Text
+                <TouchableOpacity
                   style={[
-                    styles.filterText,
-                    showLandmarks && { color: colorTheme.mapText },
+                    styles.filterPill,
+                    showLandmarks && styles.filterPillActive,
+                    showLandmarks && {
+                      backgroundColor: colorTheme.mapDestination,
+                    },
                   ]}
+                  onPress={() => setShowLandmarks(!showLandmarks)}
                 >
-                  Landmarks
-                </Text>
-              </TouchableOpacity>
-              <TouchableOpacity
-                style={[
-                  styles.filterPill,
-                  showBranches && styles.filterPillActive,
-                  showBranches && { backgroundColor: colorTheme.mapBranch },
-                ]}
-                onPress={() => setShowBranches(!showBranches)}
-              >
-                <Text
+                  <Text
+                    style={[
+                      styles.filterText,
+                      showLandmarks && { color: colorTheme.mapText },
+                    ]}
+                  >
+                    Landmarks
+                  </Text>
+                </TouchableOpacity>
+                <TouchableOpacity
                   style={[
-                    styles.filterText,
-                    showBranches && { color: colorTheme.mapText },
+                    styles.filterPill,
+                    showBranches && styles.filterPillActive,
+                    showBranches && { backgroundColor: colorTheme.mapBranch },
                   ]}
+                  onPress={() => setShowBranches(!showBranches)}
                 >
-                  Near me "Branches"
-                </Text>
-              </TouchableOpacity>
-            </ScrollView>
+                  <Text
+                    style={[
+                      styles.filterText,
+                      showBranches && { color: colorTheme.mapText },
+                    ]}
+                  >
+                    Near me "Branches"
+                  </Text>
+                </TouchableOpacity>
+              </ScrollView>
             )}
           </View>
         </TouchableWithoutFeedback>
@@ -745,7 +802,7 @@ const styles = StyleSheet.create({
     marginTop: 8,
     borderRadius: 16,
     borderWidth: 1,
-    overflow: 'hidden',
+    overflow: "hidden",
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,

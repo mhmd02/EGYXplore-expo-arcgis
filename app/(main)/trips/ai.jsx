@@ -83,7 +83,7 @@ export default function Chat() {
   async function handleAuthenticationError(error) {
     if (!(error instanceof AiAuthenticationError)) return false;
 
-    await logout();
+    await logout(); // WHY LOG OUT??
     Alert.alert("Session expired", error.message);
     return true;
   }
