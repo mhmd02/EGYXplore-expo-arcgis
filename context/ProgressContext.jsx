@@ -20,7 +20,7 @@ export function ProgressProvider({ children }) {
   const { token, isLoading: userLoading } = useUser();
   const [completedIds, setCompletedIds] = useState([]);
   const [totalPoints, setTotalPoints] = useState(0);
-  const [redeemedIds, setRedeemedIds] = useState([]);
+  const [redemptions, setRedemptions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
@@ -46,11 +46,11 @@ export function ProgressProvider({ children }) {
 
   const fetchRedeemed = useCallback(async () => {
     if (!token) {
-      setRedeemedIds([]);
+      setRedemptions([]);
       return;
     }
     const data = await getMyRedeemedRewards(token);
-    setRedeemedIds(data);
+    setRedemptions(data);
   }, [token]);
 
   useEffect(() => {
@@ -78,14 +78,24 @@ export function ProgressProvider({ children }) {
     return result;
   };
 
+  const isRedeemed = (rewardId) =>
+    redemptions.some((r) => r.rewardId === rewardId);
+
   const redeemReward = async (rewardId) => {
     const result = await redeemRewardApi(token, rewardId);
-    setRedeemedIds((prev) => [...prev, rewardId]);
+    setRedemptions((prev) => [
+      ...prev,
+      {
+        rewardId,
+        code: result.code,
+        status: result.status,
+        redemptionDate: result.redemptionDate,
+        pointsRedeemed: result.pointsRedeemed,
+      },
+    ]);
     setTotalPoints(result.remainingPoints);
     return result;
   };
-
-  const isRedeemed = (id) => redeemedIds.includes(id);
 
   return (
     <ProgressContext.Provider
@@ -94,7 +104,7 @@ export function ProgressProvider({ children }) {
         totalPoints,
         isCompleted,
         completeMission,
-        redeemedIds,
+        redemptions,
         isRedeemed,
         redeemReward,
         loading,

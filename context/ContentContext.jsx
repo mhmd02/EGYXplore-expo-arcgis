@@ -75,6 +75,7 @@ export default function ContentProvider({ children }) {
   }, [token, userLoading]);
 
   useNotificationHub(token, {
+    
     MissionAdded: (mission) => {
       setMissions((prev) => (prev ? [...prev, mission] : [mission]));
       setNewMission(true);

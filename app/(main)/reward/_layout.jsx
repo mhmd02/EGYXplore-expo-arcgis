@@ -63,6 +63,12 @@ export default function TripsStackLayout() {
             title: "Reward Details",
           }}
         />
+        <Stack.Screen
+          name="completedRewards"
+          options={{
+            title: "Redemptions",
+          }}
+        />
       </Stack>
     </>
   );
