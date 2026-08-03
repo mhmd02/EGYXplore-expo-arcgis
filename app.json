@@ -44,7 +44,8 @@
           "microphonePermission": "Allow Mock-Sdk-RN to access your microphone."
         }
       ],
-      "expo-secure-store"
+      "expo-secure-store",
+      "@react-native-community/datetimepicker"
     ]
   }
 }

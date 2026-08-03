@@ -8,6 +8,7 @@ import { UserProvider } from "../context/UserContext";
 import SettingsProvider from "../context/SettingsContext";
 import UriProvider from "../context/UriContext";
 import ContentProvider from "../context/ContentContext";
+import TripDraftProvider from "../context/TripDraftContext";
 
 function MainLayout() {
   const context = useContext(ThemeContext);
@@ -47,7 +48,9 @@ export default function RootLayout() {
           <SettingsProvider>
             <UriProvider>
               <ContentProvider>
-                <MainLayout />
+                <TripDraftProvider>
+                  <MainLayout />
+                </TripDraftProvider>
               </ContentProvider>
             </UriProvider>
           </SettingsProvider>
