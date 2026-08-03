@@ -17,6 +17,7 @@ import { useProgress } from "../../../context/ProgressContext";
 import { useTabBarClearance } from "../../../constants/layout";
 import { ContentContext } from "../../../context/ContentContext";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
+import { FontAwesome } from "@expo/vector-icons";
 
 export default function Rewards() {
   const [selectedType, setSelectedType] = useState("All");
@@ -30,7 +31,7 @@ export default function Rewards() {
   const {
     totalPoints,
     isRedeemed,
-    redeemedIds,
+    redemptions,
     redeemReward,
     error: progressError,
     loading: progressLoading,
@@ -47,16 +48,17 @@ export default function Rewards() {
     return uniqueTypes;
   }, [rewards, loading]);
 
-  const visibleRewards = useMemo(() => {
+  const currentAvailableReward = useMemo(() => {
     if (loading || !rewards) return [];
-    return (
-      selectedType === "All"
-        ? [...rewards]
-        : rewards.filter((r) => r.type === selectedType)
-    ).sort((a, b) => {
-      return isRedeemed(b.id) - isRedeemed(a.id);
-    });
-  }, [rewards, loading, selectedType, redeemedIds]);
+    return rewards.filter((r) => !isRedeemed(r.id));
+  }, [rewards, redemptions, loading]);
+
+  const visibleRewards = useMemo(() => {
+    if (loading) return [];
+    return selectedType === "All"
+      ? [...currentAvailableReward]
+      : currentAvailableReward.filter((r) => r.type === selectedType);
+  }, [currentAvailableReward, loading, selectedType]);
 
   if (loading) {
     return (
@@ -91,21 +93,35 @@ export default function Rewards() {
         <ThemedText title={true} style={styles.header}>
           Rewards
         </ThemedText>
-
-        <View
-          style={[
-            styles.balanceCircle,
-            {
-              backgroundColor: colorTheme.uiBackground,
-              borderColor: Colors.accent,
-              shadowColor: Colors.accent, // A subtle colored shadow for aesthetics
-            },
-          ]}
-        >
-          <Text style={styles.balanceValue}>{totalPoints}</Text>
-          <Text style={[styles.balancePts, { color: colorTheme.text }]}>
-            PTS
-          </Text>
+        <View style={styles.subHeaderRow}>
+          <TouchableOpacity
+            style={styles.trophy}
+            onPress={() => router.push("/reward/completedRewards")}
+          >
+            <FontAwesome name="trophy" size={24} color={colorTheme.title} />
+            {redemptions.length > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>
+                  {redemptions.length > 99 ? "99+" : redemptions.length}
+                </Text>
+              </View>
+            )}
+          </TouchableOpacity>
+          <View
+            style={[
+              styles.balanceCircle,
+              {
+                backgroundColor: colorTheme.uiBackground,
+                borderColor: Colors.accent,
+                shadowColor: Colors.accent, // A subtle colored shadow for aesthetics
+              },
+            ]}
+          >
+            <Text style={styles.balanceValue}>{totalPoints}</Text>
+            <Text style={[styles.balancePts, { color: colorTheme.text }]}>
+              PTS
+            </Text>
+          </View>
         </View>
       </View>
 
@@ -203,12 +219,38 @@ const styles = StyleSheet.create({
     alignItems: "center",
     justifyContent: "space-between",
     paddingHorizontal: 16,
+    // marginTop: 10,
+  },
+  subHeaderRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 12,
   },
   header: {
     fontSize: 32, // Slightly larger for a nice header look
     fontWeight: "800",
     marginTop: 10, // Pushes it down from the top edge so it doesn't clip
     marginBottom: 8, // Pushes it down from the top edge so it doesn't clip
+  },
+  trophy: {
+    position: "relative", // anchor for the badge
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    left: 12,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: Colors.danger ?? "#DC2626",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
   },
   // Points balance header
   // Circular points badge (right of the filter row)

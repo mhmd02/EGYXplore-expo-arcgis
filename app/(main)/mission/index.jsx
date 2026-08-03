@@ -17,7 +17,7 @@ import { useProgress } from "../../../context/ProgressContext";
 import { useTabBarClearance } from "../../../constants/layout";
 import { ContentContext } from "../../../context/ContentContext";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
-import { Ionicons } from "@expo/vector-icons";
+import { Ionicons, FontAwesome } from "@expo/vector-icons";
 
 export default function Missions() {
   const router = useRouter();
@@ -27,6 +27,7 @@ export default function Missions() {
     isCompleted,
     loading: progressLoading,
     error: progressError,
+    completedIds,
   } = useProgress();
   const {
     missions,
@@ -46,14 +47,17 @@ export default function Missions() {
     return uniqueTypes;
   }, [missions, loading]);
 
-  const visibleMissions = useMemo(() => {
+  const currentAvailableMission = useMemo(() => {
     if (loading || !missions) return [];
-    return (
-      selectedType === "All"
-        ? [...missions]
-        : missions.filter((m) => m.type === selectedType)
-    ).sort((a, b) => isCompleted(b.id) - isCompleted(a.id));
-  }, [loading, missions, selectedType, isCompleted]);
+    return missions.filter((m) => !completedIds.includes(m.id));
+  }, [missions, completedIds, loading]);
+
+  const visibleMissions = useMemo(() => {
+    if (loading) return [];
+    return selectedType === "All"
+      ? [...currentAvailableMission]
+      : currentAvailableMission.filter((m) => m.type === selectedType);
+  }, [loading, currentAvailableMission, selectedType]);
 
   if (loading) {
     return (
@@ -88,6 +92,19 @@ export default function Missions() {
         <ThemedText title={true} style={styles.header}>
           Missions
         </ThemedText>
+        <TouchableOpacity
+          style={styles.flag}
+          onPress={() => router.push("/mission/completedMissions")}
+        >
+          <FontAwesome name="flag" size={24} color={colorTheme.title} />
+          {completedIds.length > 0 && (
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {completedIds.length > 99 ? "99+" : completedIds.length}
+              </Text>
+            </View>
+          )}
+        </TouchableOpacity>
       </ThemedView>
       {/* Mission type filter chips */}
       <FilterChips
@@ -151,8 +168,30 @@ const styles = StyleSheet.create({
   missionHeader: {
     flexDirection: "row",
     alignItems: "center",
+    alignContent: "center",
     justifyContent: "space-between",
     gap: 10,
+  },
+  flag: {
+    paddingHorizontal: 20,
+    position: "relative", // anchor for the badge
+  },
+  badge: {
+    position: "absolute",
+    top: -4,
+    right: 12,
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    paddingHorizontal: 4,
+    backgroundColor: Colors.danger ?? "#DC2626",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  badgeText: {
+    color: "#fff",
+    fontSize: 10,
+    fontWeight: "700",
   },
   centered: {
     justifyContent: "center",

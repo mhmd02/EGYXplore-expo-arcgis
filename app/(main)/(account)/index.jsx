@@ -23,7 +23,7 @@ export default function Account() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const router = useRouter();
-  const { totalPoints, redeemedIds } = useProgress();
+  const { totalPoints, redemptions } = useProgress();
   const { user, logout } = useUser();
   const [helpVisible, setHelpVisible] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
@@ -130,7 +130,7 @@ export default function Account() {
         <TouchableOpacity
           style={[styles.linkRow, styles.linkSpacing]}
           activeOpacity={0.7}
-          onPress={() => router.push("/reward")}
+          onPress={() => router.push("/reward/completedRewards")}
         >
           <Ionicons
             name="gift-outline"
@@ -139,10 +139,10 @@ export default function Account() {
             style={styles.linkIcon}
           />
           <View style={styles.linkTextWrap}>
-            <ThemedText style={styles.linkTitle}>My Rewards</ThemedText>
+            <ThemedText style={styles.linkTitle}>My Vouchers</ThemedText>
             <ThemedText style={styles.linkSub}>
-              {redeemedIds.length > 0
-                ? `${redeemedIds.length} redeemed`
+              {redemptions.length > 0
+                ? `${redemptions.length} redeemed`
                 : "Browse and redeem rewards"}
             </ThemedText>
           </View>

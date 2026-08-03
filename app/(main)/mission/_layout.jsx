@@ -56,6 +56,12 @@ export default function TripsStackLayout() {
             title: "Mission Details",
           }}
         />
+        <Stack.Screen
+          name="completedMissions"
+          options={{
+            title: "Completed Missions",
+          }}
+        />
       </Stack>
     </>
   );
