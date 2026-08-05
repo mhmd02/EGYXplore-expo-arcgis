@@ -100,7 +100,7 @@ export default function Trips() {
             style={[styles.description, { color: colorTheme.text }]}
             numberOfLines={3}
           >
-            {item.description}
+            {item.description || "No description provided."}
           </ThemedText>
         </View>
         <View style={styles.cardTopRow}>
@@ -210,12 +210,10 @@ export default function Trips() {
               style={styles.iconBtn}
               onPress={() => router.push("/trips/ai")}
             >
-              <Ionicons
-                name="eye-outline"
-                size={24}
-                color={colorTheme.title}
-              />
-              <Text style={[styles.iconBtnText, { color: colorTheme.title }]}>AI</Text>
+              <Ionicons name="eye-outline" size={24} color={colorTheme.title} />
+              <Text style={[styles.iconBtnText, { color: colorTheme.title }]}>
+                AI
+              </Text>
             </TouchableOpacity>
           </View>
         </View>
