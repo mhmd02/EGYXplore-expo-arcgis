@@ -21,7 +21,7 @@ export const Colors = {
 
     // --- Map Specific Colors ---
     mapText: "#FFFFFF", // White text on Ocean Blue
-    mapDestination: "#0284C7", // Professional Ocean Blue for light maps
+    mapDestination: "#F59E0B", // Professional Ocean Blue for light maps
     mapBranch: "#F59E0B", // Warm Sun Orange
     mapLabelText: "#0F172A",
     mapLabelHalo: "#FFFFFF",
@@ -43,8 +43,8 @@ export const Colors = {
 
     // --- Map Specific Colors ---
     mapText: "#0F172A", // Dark Navy text on Bright Sky Blue for readable contrast
-    mapDestination: "#38BDF8", // Bright Sky Blue to pop on dark slate maps
-    mapBranch: "#FCD34D", // Glowing Gold
+    mapDestination: "#FCD34D", // Bright Sky Blue to pop on dark slate maps
+    mapBranch: "#38BDF8", // Glowing Gold
     mapLabelText: "#FFFFFF",
     mapLabelHalo: "#1E293B",
   },

@@ -37,6 +37,8 @@ import {
   ARCGIS_LICENSE_KEY,
   FEATURE_LAYERS,
   MAP_CENTER,
+  DESTINATIONS_PORTAL_ID,
+  LAYER_FIELDS,
 } from "../../config/arcgis.js";
 
 // Dynamic renderers are generated inside the component based on ThemeContext.
@@ -180,30 +182,30 @@ export default function Explore() {
     const delayDebounceFn = setTimeout(async () => {
       if (searchQuery.trim().length > 1 && showSuggestions) {
         const term = sanitizeSearchTerm(searchQuery.trim().toLowerCase());
-        const whereClause = `LOWER(Name) LIKE '%${term}%'`;
-
         let localSuggestions = [];
         try {
           if (destLayerRef.current) {
+            const destWhere = `LOWER(${LAYER_FIELDS.destination}) LIKE '%${term}%'`;
             const destRes = await destLayerRef.current.queryFeatures({
-              whereClause,
+              whereClause: destWhere,
             });
             if (destRes)
               localSuggestions.push(
                 ...destRes.map((f) => ({
-                  name: f.attributes.Name,
+                  name: f.attributes[LAYER_FIELDS.destination],
                   type: "landmark",
                 })),
               );
           }
           if (branchesLayerRef.current) {
+            const branchWhere = `LOWER(${LAYER_FIELDS.branches}) LIKE '%${term}%'`;
             const branchRes = await branchesLayerRef.current.queryFeatures({
-              whereClause,
+              whereClause: branchWhere,
             });
             if (branchRes)
               localSuggestions.push(
                 ...branchRes.map((f) => ({
-                  name: f.attributes.Name,
+                  name: f.attributes[LAYER_FIELDS.branches],
                   type: "branch",
                 })),
               );
@@ -302,12 +304,12 @@ export default function Explore() {
 
     try {
       const term = sanitizeSearchTerm(queryToUse.trim().toLowerCase());
-      const whereClause = `LOWER(Name) LIKE '%${term}%'`;
-
+      const destWhere = `LOWER(${LAYER_FIELDS.destination}) LIKE '%${term}%'`;
+      const branchWhere = `LOWER(${LAYER_FIELDS.branches}) LIKE '%${term}%'`;
       // 1. Search local Destinations first
       if (destLayerRef.current) {
         const destResults = await destLayerRef.current.queryFeatures({
-          whereClause,
+          whereClause: destWhere,
         });
         if (destResults && destResults.length > 0) {
           const feature = destResults[0];
@@ -334,7 +336,7 @@ export default function Explore() {
       // 2. Search local Branches next
       if (branchesLayerRef.current) {
         const branchResults = await branchesLayerRef.current.queryFeatures({
-          whereClause,
+          whereClause: branchWhere,
         });
         if (branchResults && branchResults.length > 0) {
           const feature = branchResults[0];
@@ -761,7 +763,7 @@ export default function Explore() {
           ]}
           onPress={handleGoToMyLocation}
         >
-          <Ionicons name="locate" size={24} color={colorTheme.title} />
+          <Ionicons name="locate" size={18} color={colorTheme.title} />
         </TouchableOpacity>
       </ThemedView>
     </>
@@ -823,8 +825,8 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
     borderRadius: 20,
     backgroundColor: "#E2E8F0",
     marginRight: 8,
@@ -883,9 +885,9 @@ const styles = StyleSheet.create({
   myLocationButton: {
     position: "absolute",
     right: 16,
-    width: 50,
-    height: 50,
-    borderRadius: 25,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
     justifyContent: "center",
     alignItems: "center",
     zIndex: 15,

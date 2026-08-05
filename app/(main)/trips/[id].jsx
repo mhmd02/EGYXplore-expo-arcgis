@@ -1,5 +1,12 @@
-import { Image, Text, View, StyleSheet, ScrollView } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import {
+  Image,
+  Text,
+  View,
+  StyleSheet,
+  ScrollView,
+  TouchableOpacity,
+} from "react-native";
+import { Link, useLocalSearchParams } from "expo-router";
 import { useContext, useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -142,6 +149,18 @@ export default function TripDetail() {
                 {destinationDetails.visitors} Visitors
               </ThemedText>
             </View>
+            <TouchableOpacity>
+              <View style={styles.statItem}>
+                <Ionicons name="ticket-outline" size={16} color={"#D4AF37"} />
+                <TouchableOpacity>
+                  <Link href={destinationDetails.bookingUrl}>
+                    <ThemedText title={true} style={styles.booking}>
+                      Booking Link
+                    </ThemedText>
+                  </Link>
+                </TouchableOpacity>
+              </View>
+            </TouchableOpacity>
           </View>
         </View>
 
@@ -155,7 +174,8 @@ export default function TripDetail() {
               style={styles.cardIcon}
             />
             <ThemedText style={styles.cardValue}>
-              {destinationDetails.openHour || "Not specified"}
+              {`${destinationDetails.openAt} - ${destinationDetails.closeAt}` ||
+                "Not specified"}
             </ThemedText>
             <ThemedText style={styles.cardLabel}>Opening Hours</ThemedText>
           </ThemedCard>
@@ -168,8 +188,8 @@ export default function TripDetail() {
               style={styles.cardIcon}
             />
             <ThemedText style={styles.cardValue}>
-              {destinationDetails.ticketPrice
-                ? `${destinationDetails.ticketPrice} EGP`
+              {destinationDetails.foreignPrice
+                ? `${destinationDetails.foreignPrice} EGP`
                 : "Free"}
             </ThemedText>
             <ThemedText style={styles.cardLabel}>Entry Fee</ThemedText>
@@ -323,6 +343,10 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 12,
+  },
+  booking: {
+    fontSize: 14,
+    fontWeight: "600",
   },
   description: {
     fontSize: 15,

@@ -37,11 +37,7 @@ export default function TripsStackLayout() {
                 marginTop: 10,
               }}
             >
-              <Ionicons
-                name="chevron-back"
-                size={24}
-                color={colorTheme.title}
-              />
+              <Ionicons name="arrow-back" size={28} color={colorTheme.title} />
             </TouchableOpacity>
           ),
         }}
