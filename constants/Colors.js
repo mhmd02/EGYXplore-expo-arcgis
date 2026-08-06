@@ -22,7 +22,7 @@ export const Colors = {
     // --- Map Specific Colors ---
     mapText: "#FFFFFF", // White text on Ocean Blue
     mapDestination: "#F59E0B", // Professional Ocean Blue for light maps
-    mapBranch: "#F59E0B", // Warm Sun Orange
+    mapBranch: "#0284C7",
     mapLabelText: "#0F172A",
     mapLabelHalo: "#FFFFFF",
   },

@@ -5,8 +5,12 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  Alert,
+  FlatList,
+  Linking,
+  useWindowDimensions,
 } from "react-native";
-import { Link, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { useContext, useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -24,25 +28,54 @@ import { useTabBarClearance } from "../../../constants/layout";
 export default function TripDetail() {
   const [destinationDetails, setDestinationDetails] = useState(null);
   const [error, setError] = useState(null);
+  const [activeImageIndex, setActiveImageIndex] = useState(0);
+  const [failedImageUrls, setFailedImageUrls] = useState(() => new Set());
   const { token } = useUser();
   const { id } = useLocalSearchParams();
+  const destinationId = Array.isArray(id) ? id[0] : id;
+  const { width: windowWidth } = useWindowDimensions();
+  const galleryWidth = Math.max(windowWidth - 32, 1);
 
   const tabBarClearance = useTabBarClearance();
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
 
   useEffect(() => {
+    let isActive = true;
+
     async function loadDestination() {
       try {
-        const data = await getDestinationDetails(token, id);
-        setDestinationDetails(data);
-        console.log("RAW IMAGE:", JSON.stringify(data.image));
+        const numericId = Number(destinationId);
+
+        if (!Number.isInteger(numericId) || numericId <= 0) {
+          throw new Error("Invalid destination ID.");
+        }
+
+        const data = await getDestinationDetails(token, numericId);
+        if (isActive) setDestinationDetails(data);
       } catch (err) {
-        setError(err.message);
+        if (isActive) {
+          setError(err instanceof Error ? err.message : String(err));
+        }
       }
     }
-    if (token && id) loadDestination();
-  }, [id, token]);
+
+    if (!token) {
+      setError("Please sign in to view destination details.");
+    } else if (destinationId) {
+      setError(null);
+      setDestinationDetails(null);
+      setActiveImageIndex(0);
+      setFailedImageUrls(new Set());
+      loadDestination();
+    } else {
+      setError("Destination ID is missing.");
+    }
+
+    return () => {
+      isActive = false;
+    };
+  }, [destinationId, token]);
 
   if (error) {
     return (
@@ -55,7 +88,7 @@ export default function TripDetail() {
     );
   }
 
-  if (!destinationDetails || !token || !id) {
+  if (!destinationDetails) {
     return (
       <ThemedView safe={true} style={[styles.container, styles.centered]}>
         <CustomThemedLoader />
@@ -66,6 +99,79 @@ export default function TripDetail() {
   function proxiedImageUrl(url) {
     if (!url) return null;
     return `https://wsrv.nl/?url=${encodeURIComponent(url)}`;
+  }
+
+  const imageUrls = [
+    ...new Set(
+      (Array.isArray(destinationDetails.images)
+        ? destinationDetails.images
+        : []
+      )
+        .filter((url) => typeof url === "string")
+        .map((url) => url.trim())
+        .filter((url) => url && !/^(null|n\/a)$/i.test(url)),
+    ),
+  ];
+  const rawBookingUrl = destinationDetails.bookingUrl?.trim();
+  const hasBookingUrl =
+    rawBookingUrl && !/^(null|n\/a)$/i.test(rawBookingUrl);
+  const bookingUrl = hasBookingUrl
+    ? /^https?:\/\//i.test(rawBookingUrl)
+      ? rawBookingUrl
+      : `https://${rawBookingUrl}`
+    : null;
+  const openingHours =
+    destinationDetails.openAt != null && destinationDetails.closeAt != null
+      ? `${destinationDetails.openAt} - ${destinationDetails.closeAt}`
+      : "Not specified";
+  const entryPrice =
+    destinationDetails.foreignPrice ?? destinationDetails.ticketPrice;
+
+  async function openBookingUrl() {
+    if (!bookingUrl) return;
+
+    try {
+      await Linking.openURL(bookingUrl);
+    } catch {
+      Alert.alert(
+        "Cannot open link",
+        "The booking URL is invalid or unavailable.",
+      );
+    }
+  }
+
+  function markImageAsFailed(url) {
+    setFailedImageUrls((currentUrls) => {
+      const nextUrls = new Set(currentUrls);
+      nextUrls.add(url);
+      return nextUrls;
+    });
+  }
+
+  function renderImage({ item, index }) {
+    if (failedImageUrls.has(item)) {
+      return (
+        <View
+          style={[styles.image, styles.fallbackImage, { width: galleryWidth }]}
+        >
+          <Ionicons
+            name="image-outline"
+            size={40}
+            color={colorTheme.text ?? "#888"}
+          />
+          <ThemedText style={styles.fallbackText}>Image unavailable</ThemedText>
+        </View>
+      );
+    }
+
+    return (
+      <Image
+        source={{ uri: proxiedImageUrl(item) }}
+        style={[styles.image, { width: galleryWidth }]}
+        onError={() => markImageAsFailed(item)}
+        accessibilityLabel={`${destinationDetails.name} photo ${index + 1}`}
+      />
+    );
   }
 
   return (
@@ -83,15 +189,29 @@ export default function TripDetail() {
           { paddingBottom: tabBarClearance },
         ]}
       >
-        {/* Hero Image with Robust Error & Null Handling */}
+        {/* Destination photo gallery */}
         <View style={styles.imageContainer}>
-          {destinationDetails.image && destinationDetails.image !== "null" ? (
-            <Image
-              source={{ uri: proxiedImageUrl(destinationDetails.image) }}
-              style={styles.image}
-              onError={(e) =>
-                console.log("IMAGE LOAD ERROR:", e.nativeEvent.error)
-              }
+          {imageUrls.length > 0 ? (
+            <FlatList
+              key={galleryWidth}
+              data={imageUrls}
+              horizontal
+              pagingEnabled
+              bounces={false}
+              showsHorizontalScrollIndicator={false}
+              keyExtractor={(url) => url}
+              renderItem={renderImage}
+              getItemLayout={(_, index) => ({
+                length: galleryWidth,
+                offset: galleryWidth * index,
+                index,
+              })}
+              onMomentumScrollEnd={(event) => {
+                const nextIndex = Math.round(
+                  event.nativeEvent.contentOffset.x / galleryWidth,
+                );
+                setActiveImageIndex(nextIndex);
+              }}
             />
           ) : (
             <View style={[styles.image, styles.fallbackImage]}>
@@ -103,6 +223,14 @@ export default function TripDetail() {
               <ThemedText style={styles.fallbackText}>
                 No Image Available
               </ThemedText>
+            </View>
+          )}
+
+          {imageUrls.length > 1 && (
+            <View style={styles.imageCounter}>
+              <Text style={styles.imageCounterText}>
+                {activeImageIndex + 1} / {imageUrls.length}
+              </Text>
             </View>
           )}
 
@@ -136,7 +264,9 @@ export default function TripDetail() {
             <View style={styles.statItem}>
               <Ionicons name="star" size={16} color="#D4AF37" />
               <ThemedText style={styles.statText}>
-                {destinationDetails.rating} / 5
+                {destinationDetails.rating != null
+                  ? `${destinationDetails.rating} / 5`
+                  : "Not rated"}
               </ThemedText>
             </View>
             <View style={styles.statItem}>
@@ -149,18 +279,19 @@ export default function TripDetail() {
                 {destinationDetails.visitors} Visitors
               </ThemedText>
             </View>
-            <TouchableOpacity>
-              <View style={styles.statItem}>
-                <Ionicons name="ticket-outline" size={16} color={"#D4AF37"} />
-                <TouchableOpacity>
-                  <Link href={destinationDetails.bookingUrl}>
-                    <ThemedText title={true} style={styles.booking}>
-                      Booking Link
-                    </ThemedText>
-                  </Link>
-                </TouchableOpacity>
-              </View>
-            </TouchableOpacity>
+            {bookingUrl && (
+              <TouchableOpacity
+                style={styles.statItem}
+                onPress={openBookingUrl}
+                accessibilityRole="link"
+                accessibilityLabel={`Book tickets for ${destinationDetails.name}`}
+              >
+                <Ionicons name="ticket-outline" size={16} color="#D4AF37" />
+                <ThemedText title={true} style={styles.booking}>
+                  Booking Link
+                </ThemedText>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
 
@@ -174,8 +305,7 @@ export default function TripDetail() {
               style={styles.cardIcon}
             />
             <ThemedText style={styles.cardValue}>
-              {`${destinationDetails.openAt} - ${destinationDetails.closeAt}` ||
-                "Not specified"}
+              {openingHours}
             </ThemedText>
             <ThemedText style={styles.cardLabel}>Opening Hours</ThemedText>
           </ThemedCard>
@@ -188,9 +318,11 @@ export default function TripDetail() {
               style={styles.cardIcon}
             />
             <ThemedText style={styles.cardValue}>
-              {destinationDetails.foreignPrice
-                ? `${destinationDetails.foreignPrice} EGP`
-                : "Free"}
+              {entryPrice != null && entryPrice > 0
+                ? `${entryPrice} EGP`
+                : entryPrice === 0
+                  ? "Free"
+                  : "Not specified"}
             </ThemedText>
             <ThemedText style={styles.cardLabel}>Entry Fee</ThemedText>
           </ThemedCard>
@@ -238,12 +370,13 @@ const styles = StyleSheet.create({
   imageContainer: {
     position: "relative",
     marginBottom: 20,
+    borderRadius: 24,
+    overflow: "hidden",
   },
   image: {
     width: "100%",
     height: 280,
     resizeMode: "cover",
-    borderRadius: 24,
   },
   fallbackImage: {
     backgroundColor: "rgba(0,0,0,0.05)",
@@ -253,6 +386,20 @@ const styles = StyleSheet.create({
   fallbackText: {
     marginTop: 8,
     opacity: 0.6,
+  },
+  imageCounter: {
+    position: "absolute",
+    right: 14,
+    bottom: 14,
+    backgroundColor: "rgba(0,0,0,0.65)",
+    paddingHorizontal: 9,
+    paddingVertical: 5,
+    borderRadius: 6,
+  },
+  imageCounterText: {
+    color: "#FFFFFF",
+    fontSize: 12,
+    fontWeight: "700",
   },
   statusBadge: {
     position: "absolute",
@@ -291,6 +438,7 @@ const styles = StyleSheet.create({
   },
   statsRow: {
     flexDirection: "row",
+    flexWrap: "wrap",
     gap: 16,
   },
   statItem: {
