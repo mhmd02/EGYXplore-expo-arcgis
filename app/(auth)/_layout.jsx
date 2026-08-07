@@ -16,7 +16,6 @@ export default function AuthLayout() {
   if (isLoading) {
     return <CustomThemedLoader />;
   }
-  // We removed the aggressive user&&token redirect here so that register.jsx can push to onboarding instead of explore.
 
   return (
     <>
@@ -24,10 +23,7 @@ export default function AuthLayout() {
       <Stack
         screenOptions={{
           headerShown: true,
-          headerTitle: "",
-          headerTitleAlign: "center",
-          headerStyle: { backgroundColor: colorTheme.navBackground },
-          headerTintColor: colorTheme.text,
+          headerBackVisible: false,
         }}
       >
         <Stack.Screen name="login" options={{ headerTitle: "Login" }} />

@@ -148,8 +148,9 @@ export default function Rewards() {
           return (
             <TouchableOpacity
               onPress={() => router.push(`/reward/${reward.id}`)}
-              disabled={!affordable || redeemed}
               key={reward.id}
+              disabled={!affordable || redeemed}
+              activeOpacity={1}
             >
               <Card key={reward.id} style={styles.card} variant="pharaonic">
                 <View style={styles.cardInfo}>

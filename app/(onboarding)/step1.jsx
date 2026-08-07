@@ -92,7 +92,9 @@ export default function Step1() {
                   <Text
                     style={[
                       styles.chipText,
-                      isSelected && styles.activeChipText,
+                      isSelected && theme === "light"
+                        ? { color: "white", fontWeight: "bold" }
+                        : styles.activeChipText,
                     ]}
                   >
                     {interest} {isSelected && "✓"}
@@ -197,17 +199,16 @@ const createStyles = (colorTheme) =>
       borderWidth: 1,
       borderColor: colorTheme.border,
       margin: 4,
-      backgroundColor: colorTheme.uiBackground,
+      backgroundColor: colorTheme.background,
     },
     activeChip: {
-      backgroundColor: colorTheme.uiBackground,
+      backgroundColor: Colors.primary,
       borderColor: colorTheme.border,
     },
     chipText: {
       color: colorTheme.text,
     },
     activeChipText: {
-      color: colorTheme.title,
       fontWeight: "bold",
     },
     // Bottom Buttons dynamic layout styling

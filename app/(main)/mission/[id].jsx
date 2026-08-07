@@ -22,6 +22,7 @@ export default function MissionDetail() {
   const mission = missions.find((m) => String(m.id) === String(id));
   const { completeMission } = useProgress();
   const [images, setImages] = useState([]);
+  const [addPhoto, setAddPhoto] = useState(true);
   const [submitted, setSubmitted] = useState(false);
   const [saved, setSaved] = useState(false);
   const [completed, setCompleted] = useState(false);
@@ -118,12 +119,12 @@ export default function MissionDetail() {
                 ]}
                 onPress={handleTakePhoto}
                 activeOpacity={0.7}
+                disabled={submitted}
               >
                 <Ionicons
                   name={completed ? "checkmark-circle" : "camera-outline"}
                   size={18}
                   color={completed ? Colors.success : Colors.primary}
-                  disabled={submitted}
                 />
                 <Text
                   style={[
@@ -131,11 +132,16 @@ export default function MissionDetail() {
                     completed && { color: Colors.success },
                   ]}
                 >
-                  {completed ? "Photo Added" : "Take Photo"}
+                  {completed
+                    ? images.length > 1
+                      ? `Add Photo (${images.length})`
+                      : "Add Photo"
+                    : "Take Photo"}
                 </Text>
               </TouchableOpacity>
             </View>
           )}
+
           {!saved && (
             <TouchableOpacity
               style={[

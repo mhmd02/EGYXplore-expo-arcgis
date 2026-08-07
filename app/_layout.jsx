@@ -27,7 +27,7 @@ function MainLayout() {
             backgroundColor: colorTheme.navBackground,
           },
           headerTintColor: colorTheme.title,
-          headerTitleAlign: "center",
+          headerTitleAlign: "left",
           headerShown: true,
         }}
       >

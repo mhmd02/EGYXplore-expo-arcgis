@@ -131,6 +131,7 @@ export default function Missions() {
               onPress={() => router.push(`/mission/${mission.id}`)}
               key={mission.id}
               disabled={done}
+              activeOpacity={1}
             >
               <Card key={mission.id} style={styles.card} variant="pharaonic">
                 <View style={styles.cardInfo}>

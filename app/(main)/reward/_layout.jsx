@@ -18,7 +18,7 @@ export default function TripsStackLayout() {
       <Stack
         screenOptions={{
           headerShown: true,
-          headerTitleAlign: "center",
+          headerTitleAlign: "left",
           headerBackVisible: false,
           animation: "slide_from_right",
           headerStyle: { backgroundColor: colorTheme.uiBackground },
@@ -31,13 +31,14 @@ export default function TripsStackLayout() {
                 }
               }}
               style={{
-                flexDirection: "row",
+                width: 40,
+                height: 40,
+                justifyContent: "center",
                 alignItems: "center",
-                paddingRight: 15,
-                marginTop: 10,
+                marginLeft: -8, // Optional: pulls icon closer to left screen edge if needed
               }}
             >
-              <Ionicons name="arrow-back" size={28} color={colorTheme.title} />
+              <Ionicons name="arrow-back" size={24} color={colorTheme.title} />
             </TouchableOpacity>
           ),
         }}

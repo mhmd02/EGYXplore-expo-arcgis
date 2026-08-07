@@ -16,7 +16,7 @@ export default function ActivitiesLayout() {
       <Stack
         screenOptions={{
           headerShown: true,
-          headerTitleAlign: "center",
+          headerTitleAlign: "left",
           headerBackVisible: false,
           animation: "slide_from_right",
           headerStyle: { backgroundColor: colorTheme.uiBackground },
