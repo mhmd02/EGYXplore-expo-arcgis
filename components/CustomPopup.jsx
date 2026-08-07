@@ -32,10 +32,6 @@ export default function CustomPopup({
     const ticketPrice =
       data.TicketPrice === 0 ? "Free Entry" : `${data.ForeignPrice} EGP`;
     const destinationsImages = data.Images.split("|");
-    const images = [
-      "https://i.pinimg.com/736x/2a/90/d3/2a90d3c6cec8a86eaf898c5e5eb23805--wallpaper-travel-hd-wallpaper.jpg",
-      "https://ichef.bbci.co.uk/news/1024/branded_arabic/b1f0/live/71ad3bd0-272f-11f0-afbf-ddff77f40225.jpg",
-    ];
     return (
       <View style={styles.overlay}>
         <ScrollView

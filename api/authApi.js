@@ -19,6 +19,12 @@ export const loginUser = async (data) => {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify(data),
   });
+
+  if(response.status === 401){
+    const errorResult = await response.json();
+    throw new Error(errorResult.message || "Session expired or user deleted.");
+  }
+
   const result = await response.json();
   if (!response.ok || !result.success) {
     throw new Error(result.message || "Login failed");

@@ -12,7 +12,7 @@ export default function OnboardingLayout() {
   return (
     <Stack
       screenOptions={{
-        headerShown: false, // Hides the native navigation bar for a custom clean look
+        headerShown: false,
       }}
     >
       <Stack.Screen name="step1" />
