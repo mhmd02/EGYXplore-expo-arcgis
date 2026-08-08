@@ -117,25 +117,25 @@ export default function MissionDetail() {
           />
           {!saved && (
             <View>
-              <TouchableOpacity
-                style={styles.photoButton}
-                onPress={addPhoto}
-                activeOpacity={0.7}
-                disabled={submitted || verifying || canVerify}
-              >
-                <Ionicons
-                  name={canVerify ? "eye-outline" : "camera-outline"}
-                  size={18}
-                  color={Colors.primary}
-                />
-                <Text style={styles.photoButtonText}>
-                  {images.length === 0
-                    ? "Take Photo"
-                    : canVerify
-                      ? "AI"
+              {!canVerify && (
+                <TouchableOpacity
+                  style={styles.photoButton}
+                  onPress={addPhoto}
+                  activeOpacity={0.7}
+                  disabled={submitted || verifying || canVerify}
+                >
+                  <Ionicons
+                    name="camera-outline"
+                    size={18}
+                    color={Colors.primary}
+                  />
+                  <Text style={styles.photoButtonText}>
+                    {images.length === 0
+                      ? "Take Photo"
                       : `Add Photo (${images.length})`}
-                </Text>
-              </TouchableOpacity>
+                  </Text>
+                </TouchableOpacity>
+              )}
 
               {images.length > 0 && (
                 <View style={styles.thumbRow}>
@@ -213,16 +213,7 @@ export default function MissionDetail() {
                   </Text>
                 </TouchableOpacity>
               )}
-              {saved && (
-                <View style={styles.finishedContainer}>
-                  <Ionicons
-                    name="checkmark-circle"
-                    size={20}
-                    color={Colors.success}
-                  />
-                  <Text style={styles.finishedText}>Mission Completed!</Text>
-                </View>
-              )}
+
               {images.length < MIN_PHOTOS_REQUIRED && (
                 <View
                   style={[
@@ -246,6 +237,16 @@ export default function MissionDetail() {
                   </Text>
                 </View>
               )}
+            </View>
+          )}
+          {saved && (
+            <View style={styles.finishedContainer}>
+              <Ionicons
+                name="checkmark-circle"
+                size={20}
+                color={Colors.success}
+              />
+              <Text style={styles.finishedText}>Mission Completed!</Text>
             </View>
           )}
           {submitError && (
