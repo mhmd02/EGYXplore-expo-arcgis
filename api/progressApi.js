@@ -24,14 +24,19 @@ export const getMyBalance = async (token) => {
   return response.json();
 };
 
-export const completeMissionApi = async (token, missionId) => {
+export const completeMissionApi = async (
+  token,
+  missionId,
+  verificationPayload,
+  verificationToken,
+) => {
   const response = await fetch(`${API_BASE_URL}/MobileMission/Complete`, {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
       Authorization: `Bearer ${token}`,
     },
-    body: JSON.stringify({ missionId }),
+    body: JSON.stringify({ missionId, verificationPayload, verificationToken }),
   });
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));

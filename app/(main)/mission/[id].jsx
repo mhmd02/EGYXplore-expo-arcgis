@@ -1,16 +1,15 @@
 import { useContext, useState } from "react";
-import { Text, View, StyleSheet, TouchableOpacity } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import ThemedView from "../../../components/ThemedView";
-import ThemedText from "../../../components/ThemedText";
 import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import SuccessModal from "../../../components/SuccessModal";
 import { Colors } from "../../../constants/Colors";
 import { ThemeContext } from "../../../context/ThemeContext";
 import { useProgress } from "../../../context/ProgressContext";
 import { ContentContext } from "../../../context/ContentContext";
-import { takePhoto } from "../../../constants/pickImages";
+import { useMissionPhotos } from "../../../constants/useMissionPhotos";
 
 export default function MissionDetail() {
   // Which mission opened this page (passed from the missions list)
@@ -21,32 +20,38 @@ export default function MissionDetail() {
   const { missions, setMissions, loading } = useContext(ContentContext);
   const mission = missions.find((m) => String(m.id) === String(id));
   const { completeMission } = useProgress();
-  const [images, setImages] = useState([]);
-  const [addPhoto, setAddPhoto] = useState(true);
+
+  const MIN_PHOTOS_REQUIRED = 3;
+  const {
+    images,
+    verifying,
+    completed,
+    error: photoError,
+    canVerify,
+    addPhoto,
+    retakePhoto,
+    verifyPhotos,
+    verificationPayload,
+    verificationToken,
+  } = useMissionPhotos(mission?.id, MIN_PHOTOS_REQUIRED);
+
+  const [submitting, setSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [saved, setSaved] = useState(false);
-  const [completed, setCompleted] = useState(false);
-  const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState(null);
 
   const handleSubmit = async () => {
     setSubmitting(true);
     setSubmitError(null);
     try {
-      await completeMission(mission.id);
+      await completeMission(mission.id, verificationPayload, verificationToken);
       setSubmitted(true);
+      setSaved(true);
     } catch (err) {
       console.error(err);
       setSubmitError(err.message || "Something went wrong. Please try again.");
     } finally {
       setSubmitting(false);
-    }
-  };
-  const handleTakePhoto = async () => {
-    const uri = await takePhoto();
-    if (uri) {
-      setImages((prevImages) => [...prevImages, uri]);
-      setCompleted(true);
     }
   };
 
@@ -113,70 +118,144 @@ export default function MissionDetail() {
           {!saved && (
             <View>
               <TouchableOpacity
-                style={[
-                  styles.photoButton,
-                  completed && styles.photoButtonDone,
-                ]}
-                onPress={handleTakePhoto}
+                style={styles.photoButton}
+                onPress={addPhoto}
                 activeOpacity={0.7}
-                disabled={submitted}
+                disabled={submitted || verifying || canVerify}
               >
                 <Ionicons
-                  name={completed ? "checkmark-circle" : "camera-outline"}
+                  name={canVerify ? "eye-outline" : "camera-outline"}
                   size={18}
-                  color={completed ? Colors.success : Colors.primary}
+                  color={Colors.primary}
                 />
-                <Text
-                  style={[
-                    styles.photoButtonText,
-                    completed && { color: Colors.success },
-                  ]}
-                >
-                  {completed
-                    ? images.length > 1
-                      ? `Add Photo (${images.length})`
-                      : "Add Photo"
-                    : "Take Photo"}
+                <Text style={styles.photoButtonText}>
+                  {images.length === 0
+                    ? "Take Photo"
+                    : canVerify
+                      ? "AI"
+                      : `Add Photo (${images.length})`}
                 </Text>
               </TouchableOpacity>
-            </View>
-          )}
 
-          {!saved && (
-            <TouchableOpacity
-              style={[
-                styles.submitButton,
-                !completed && { backgroundColor: colorTheme.border },
-              ]}
-              onPress={() => {
-                handleSubmit();
-                setSaved((prev) => !prev);
-              }}
-              disabled={!completed || submitting}
-              activeOpacity={0.8}
-            >
-              <Text style={styles.submitButtonText}>
-                {submitting
-                  ? "Saving..."
-                  : completed
-                    ? "Complete Mission"
-                    : "Finish all objectives"}
-              </Text>
-            </TouchableOpacity>
-          )}
-          {saved && (
-            <View style={styles.finishedContainer}>
-              <Ionicons
-                name="checkmark-circle"
-                size={20}
-                color={Colors.success}
-              />
-              <Text style={styles.finishedText}>Mission Completed!</Text>
+              {images.length > 0 && (
+                <View style={styles.thumbRow}>
+                  {images.map((img, index) => (
+                    <View key={img.uri} style={styles.thumbWrapper}>
+                      <Image
+                        source={{ uri: img.uri }}
+                        style={styles.thumbImage}
+                      />
+                      {img.status === "pass" && (
+                        <Ionicons
+                          name="checkmark-circle"
+                          size={18}
+                          color={Colors.success}
+                          style={styles.thumbBadge}
+                        />
+                      )}
+                      {img.status === "fail" && (
+                        <TouchableOpacity
+                          style={styles.thumbBadge}
+                          onPress={() => retakePhoto(index)}
+                        >
+                          <Ionicons
+                            name="close-circle"
+                            size={18}
+                            color={Colors.danger ?? "#DC2626"}
+                          />
+                        </TouchableOpacity>
+                      )}
+                    </View>
+                  ))}
+                </View>
+              )}
+
+              {canVerify && !completed && (
+                <TouchableOpacity
+                  style={[
+                    styles.hintButton,
+                    {
+                      alignSelf: "stretch",
+                      alignItems: "center",
+                      marginBottom: 16,
+                    },
+                  ]}
+                  onPress={verifyPhotos}
+                  activeOpacity={0.7}
+                  disabled={verifying}
+                >
+                  <Text style={styles.hintButtonText}>
+                    {verifying ? "Verifying..." : "Verify Photos"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {!saved && (
+                <TouchableOpacity
+                  style={[
+                    styles.submitButton,
+                    !completed && { backgroundColor: colorTheme.border },
+                  ]}
+                  onPress={handleSubmit}
+                  disabled={!completed || submitting}
+                  activeOpacity={0.8}
+                >
+                  <Text
+                    style={[
+                      styles.submitButtonText,
+                      { color: completed ? "#FFFFFF" : "#9CA3AF" },
+                    ]}
+                  >
+                    {submitting
+                      ? "Saving..."
+                      : completed
+                        ? "Completed Mission"
+                        : "Pending Verification"}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              {saved && (
+                <View style={styles.finishedContainer}>
+                  <Ionicons
+                    name="checkmark-circle"
+                    size={20}
+                    color={Colors.success}
+                  />
+                  <Text style={styles.finishedText}>Mission Completed!</Text>
+                </View>
+              )}
+              {images.length < MIN_PHOTOS_REQUIRED && (
+                <View
+                  style={[
+                    styles.hintPill,
+                    {
+                      borderColor: colorTheme.border,
+                      backgroundColor: `${Colors.primary}1F`,
+                    },
+                  ]}
+                >
+                  <Ionicons
+                    name="information-circle-outline"
+                    size={14}
+                    color={Colors.primary}
+                    style={{ marginRight: 6 }}
+                  />
+                  <Text
+                    style={[styles.hintPillText, { color: Colors.primary }]}
+                  >
+                    {`${images.length}/${MIN_PHOTOS_REQUIRED} photos — ${MIN_PHOTOS_REQUIRED - images.length} more to go`}
+                  </Text>
+                </View>
+              )}
             </View>
           )}
           {submitError && (
             <Text style={[styles.errorDetail, { marginTop: 10 }]}>
               {submitError}
+            </Text>
+          )}
+          {photoError && (
+            <Text style={[styles.errorDetail, { marginTop: 10 }]}>
+              {photoError}
             </Text>
           )}
         </View>
@@ -238,6 +317,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.1,
     shadowRadius: 10,
     elevation: 5,
+    marginBottom: 75,
   },
   topRow: {
     flexDirection: "row",
@@ -300,22 +380,18 @@ const styles = StyleSheet.create({
     color: "#999",
     textDecorationLine: "line-through",
   },
-  hintText: {
-    marginTop: 16,
-    fontSize: 14,
-    fontStyle: "italic",
-    lineHeight: 20,
-  },
-  // Small button with transparency
-  hintButton: {
-    alignSelf: "flex-start",
-    marginTop: 18,
-    paddingVertical: 8,
-    paddingHorizontal: 18,
+  hintPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
     borderRadius: 20,
     borderWidth: 1,
-    borderColor: Colors.primary,
-    backgroundColor: "rgba(2, 132, 199, 0.12)", // translucent primary
+  },
+  hintPillText: {
+    fontSize: 12,
+    fontWeight: "600",
   },
   hintButtonText: {
     color: Colors.primary,
@@ -329,7 +405,6 @@ const styles = StyleSheet.create({
     alignItems: "center",
   },
   submitButtonText: {
-    color: "#fff",
     fontSize: 16,
     fontWeight: "700",
   },
@@ -400,5 +475,32 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "700",
     marginLeft: 8,
+  },
+  hintButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 18,
+    borderRadius: 20,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+    backgroundColor: `${Colors.primary}1F`,
+  },
+  thumbRow: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 10,
+    marginBottom: 16,
+  },
+  thumbWrapper: {
+    position: "relative",
+  },
+  thumbImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 10,
+  },
+  thumbBadge: {
+    position: "absolute",
+    top: -6,
+    right: -6,
   },
 });

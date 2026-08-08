@@ -71,8 +71,17 @@ export function ProgressProvider({ children }) {
       .finally(() => setLoading(false));
   }, [token, userLoading, fetchCompleted, fetchBalance, fetchRedeemed]);
 
-  const completeMission = async (missionId) => {
-    const result = await completeMissionApi(token, missionId);
+  const completeMission = async (
+    missionId,
+    verificationPayload,
+    verificationToken,
+  ) => {
+    const result = await completeMissionApi(
+      token,
+      missionId,
+      verificationPayload,
+      verificationToken,
+    );
     setCompletedIds((prev) => [...prev, missionId]);
     setTotalPoints((prev) => prev + (result.pointsEarned ?? 0));
     return result;
