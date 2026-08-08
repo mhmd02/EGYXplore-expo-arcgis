@@ -24,6 +24,17 @@ export default function AuthLayout() {
         screenOptions={{
           headerShown: true,
           headerBackVisible: false,
+          headerTitleAlign: "center",
+          headerStyle: {
+            backgroundColor: colorTheme.navBackground,
+          },
+          headerTintColor: colorTheme.title,
+          headerTitleStyle: {
+            color: colorTheme.title,
+          },
+          contentStyle: {
+            backgroundColor: colorTheme.background,
+          },
         }}
       >
         <Stack.Screen name="login" options={{ headerTitle: "Login" }} />

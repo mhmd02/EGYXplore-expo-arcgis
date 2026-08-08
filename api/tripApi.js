@@ -48,6 +48,31 @@ export const getTripById = async (token, tripId) => {
   return response.json();
 };
 
+export const updateTripDestinationsApi = async (
+  token,
+  tripId,
+  destinationIds,
+) => {
+  const response = await fetch(
+    `${API_BASE_URL}/MobileTrip/UpdateTripDestinations`,
+    {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ tripId, destinationIds }),
+    },
+  );
+  if (!response.ok) {
+    const errorBody = await response.json().catch(() => ({}));
+    throw new Error(
+      errorBody.message || `Failed to update trip destinations: ${response.status}`,
+    );
+  }
+  return response.json();
+};
+
 export const completeTripApi = async (token, tripId) => {
   const response = await fetch(`${API_BASE_URL}/MobileTrip/CompleteTrip`, {
     method: "POST",

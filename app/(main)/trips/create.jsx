@@ -29,6 +29,7 @@ import ThemedButton from "../../../components/ThemedButton";
 import Card from "../../../components/Card";
 import Spacer from "../../../components/Spacer";
 import SuccessModal from "../../../components/SuccessModal";
+import { useTabBarClearance } from "../../../constants/layout";
 
 const formatDate = (date) =>
   date.toLocaleDateString(undefined, {
@@ -150,6 +151,7 @@ export default function CreateTrip() {
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
+  const tabBarClearance = useTabBarClearance();
 
   const { destinations } = useContext(ContentContext);
   const {
@@ -257,7 +259,10 @@ export default function CreateTrip() {
         keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
       >
         <ScrollView
-          contentContainerStyle={styles.scrollContent}
+          contentContainerStyle={[
+            styles.scrollContent,
+            { paddingBottom: tabBarClearance + 16 },
+          ]}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}
           scrollEnabled={!isDraggingStop}

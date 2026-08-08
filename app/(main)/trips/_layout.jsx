@@ -58,7 +58,7 @@ export default function TripsStackLayout() {
           name="[id]"
           options={{
             headerShown: true, // Turn the header on so we get the Back button
-            title: "Trip Details",
+            title: "Destination Details",
             headerBackTitle: "Back", // Text next to the back arrow on iOS
           }}
         />
