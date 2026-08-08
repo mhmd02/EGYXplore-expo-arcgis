@@ -16,6 +16,7 @@ export default function CustomPopup({
   location,
   layerInfo,
   onClose,
+  onNavigate,
   colorTheme,
 }) {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
@@ -31,7 +32,12 @@ export default function CustomPopup({
     const rating = data.Rating;
     const ticketPrice =
       data.TicketPrice === 0 ? "Free Entry" : `${data.ForeignPrice} EGP`;
-    const destinationsImages = data.Images.split("|");
+    const destinationsImages =
+      typeof data.Images === "string"
+        ? data.Images.split("|")
+            .map((image) => image.trim())
+            .filter(Boolean)
+        : [];
     return (
       <View style={styles.overlay}>
         <ScrollView
@@ -80,6 +86,18 @@ export default function CustomPopup({
                 <Text style={styles.infoText}>{ticketPrice}</Text>
               </View>
             </View>
+            {onNavigate && (
+              <TouchableOpacity
+                style={styles.detailsButton}
+                onPress={() => onNavigate(data)}
+                activeOpacity={0.8}
+                accessibilityRole="link"
+                accessibilityLabel={`View details for ${name}`}
+              >
+                <Text style={styles.detailsButtonText}>View Details</Text>
+                <Ionicons name="arrow-forward" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
             <View style={styles.swipeIndicator}>
               <Text style={styles.swipeText}>Swipe</Text>
               <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
@@ -264,7 +282,7 @@ const createStyles = (colorTheme) =>
     swipeIndicator: {
       position: "absolute",
       right: 25,
-      bottom: 15,
+      bottom: 7,
       flexDirection: "row",
       alignItems: "center",
       opacity: 0.6,
@@ -274,5 +292,21 @@ const createStyles = (colorTheme) =>
       color: "#94A3B8",
       marginRight: 2,
       fontWeight: "600",
+    },
+    detailsButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: "#3B82F6",
+      paddingVertical: 12,
+      paddingHorizontal: 20,
+      borderRadius: 14,
+      marginTop: 16,
+      gap: 8,
+    },
+    detailsButtonText: {
+      color: "#fff",
+      fontSize: 15,
+      fontWeight: "700",
     },
   });

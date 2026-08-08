@@ -16,6 +16,7 @@ import { Ionicons } from "@expo/vector-icons";
 
 import { ThemeContext } from "../../../context/ThemeContext";
 import { useUser } from "../../../context/UserContext";
+import { useTripDraft } from "../../../context/TripDraftContext";
 import { getDestinationDetails } from "../../../api/contentApi";
 import { Colors } from "../../../constants/Colors";
 
@@ -31,6 +32,7 @@ export default function TripDetail() {
   const [activeImageIndex, setActiveImageIndex] = useState(0);
   const [failedImageUrls, setFailedImageUrls] = useState(() => new Set());
   const { token } = useUser();
+  const { isInDraft, toggleDraft, draftCount } = useTripDraft();
   const { id } = useLocalSearchParams();
   const destinationId = Array.isArray(id) ? id[0] : id;
   const { width: windowWidth } = useWindowDimensions();
@@ -126,6 +128,7 @@ export default function TripDetail() {
       : "Not specified";
   const entryPrice =
     destinationDetails.foreignPrice ?? destinationDetails.ticketPrice;
+  const destinationIsInDraft = isInDraft(destinationDetails.id);
 
   async function openBookingUrl() {
     if (!bookingUrl) return;
@@ -259,6 +262,28 @@ export default function TripDetail() {
               {destinationDetails.city}
             </ThemedText>
           </View>
+
+          <TouchableOpacity
+            style={[
+              styles.itineraryButton,
+              destinationIsInDraft && styles.itineraryButtonAdded,
+            ]}
+            onPress={() => toggleDraft(destinationDetails.id)}
+            accessibilityRole="button"
+            accessibilityLabel={`${destinationIsInDraft ? "Remove" : "Add"} ${destinationDetails.name} ${destinationIsInDraft ? "from" : "to"} itinerary`}
+          >
+            <Ionicons
+              name={destinationIsInDraft ? "checkmark-circle" : "add-circle-outline"}
+              size={20}
+              color={destinationIsInDraft ? Colors.success : Colors.primary}
+            />
+            <ThemedText style={styles.itineraryButtonText}>
+              {destinationIsInDraft ? "Added to Itinerary" : "Add to Itinerary"}
+            </ThemedText>
+            {draftCount > 0 && (
+              <Text style={styles.itineraryCount}>{draftCount}</Text>
+            )}
+          </TouchableOpacity>
 
           <View style={styles.statsRow}>
             <View style={styles.statItem}>
@@ -491,6 +516,30 @@ const styles = StyleSheet.create({
     fontSize: 20,
     fontWeight: "700",
     marginBottom: 12,
+  },
+  itineraryButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: 8,
+    marginBottom: 24,
+    paddingVertical: 13,
+    paddingHorizontal: 16,
+    borderRadius: 12,
+    borderWidth: 1,
+    borderColor: Colors.primary,
+  },
+  itineraryButtonAdded: {
+    borderColor: Colors.success,
+    backgroundColor: "rgba(16, 185, 129, 0.1)",
+  },
+  itineraryButtonText: {
+    fontWeight: "700",
+  },
+  itineraryCount: {
+    color: Colors.primary,
+    fontSize: 12,
+    fontWeight: "800",
   },
   booking: {
     fontSize: 14,

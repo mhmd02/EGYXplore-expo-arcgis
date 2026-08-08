@@ -25,6 +25,7 @@ import {
 } from "expo-arcgis";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import * as Location from "expo-location";
 
 import ThemedView from "../../components/ThemedView";
@@ -106,6 +107,7 @@ export default function Explore() {
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
+  const router = useRouter();
 
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
 
@@ -579,6 +581,23 @@ export default function Explore() {
                 setClickLocation(null);
                 setSearchPoint(null);
                 setHighlightGraphic(null);
+              }}
+              onNavigate={(featureData) => {
+                const destinationId = Number(featureData?.Id);
+
+                if (!Number.isInteger(destinationId) || destinationId <= 0) {
+                  Alert.alert(
+                    "Destination unavailable",
+                    "Details are unavailable for this destination.",
+                  );
+                  return;
+                }
+
+                setSelectedFeature(null);
+                setClickLocation(null);
+                setSearchPoint(null);
+                setHighlightGraphic(null);
+                router.push(`/trips/${destinationId}`);
               }}
               colorTheme={colorTheme}
             />

@@ -3,6 +3,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TouchableOpacity,
   View,
 } from "react-native";
 import { useContext, useEffect, useMemo, useState } from "react";
@@ -13,7 +14,11 @@ import { Colors } from "../../../../constants/Colors";
 import { ThemeContext } from "../../../../context/ThemeContext";
 import { useUser } from "../../../../context/UserContext";
 import { useTripDraft } from "../../../../context/TripDraftContext";
-import { getTripById } from "../../../../api/tripApi";
+import { ContentContext } from "../../../../context/ContentContext";
+import {
+  getTripById,
+  updateTripDestinationsApi,
+} from "../../../../api/tripApi";
 import ThemedView from "../../../../components/ThemedView";
 import ThemedText from "../../../../components/ThemedText";
 import ThemedButton from "../../../../components/ThemedButton";
@@ -21,6 +26,7 @@ import Card from "../../../../components/Card";
 import CustomThemedLoader from "../../../../components/CustomThemedLoader";
 import Spacer from "../../../../components/Spacer";
 import SuccessModal from "../../../../components/SuccessModal";
+import { useTabBarClearance } from "../../../../constants/layout";
 
 const formatDate = (value) =>
   new Date(value).toLocaleDateString(undefined, {
@@ -41,9 +47,11 @@ export default function TripDetails() {
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
+  const tabBarClearance = useTabBarClearance();
 
   const { token } = useUser();
-  const { completeTrip, deleteTrip } = useTripDraft();
+  const { completeTrip, deleteTrip, refreshTrips } = useTripDraft();
+  const { destinations } = useContext(ContentContext);
 
   const [trip, setTrip] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -51,8 +59,44 @@ export default function TripDetails() {
   const [actionError, setActionError] = useState(null);
   const [busy, setBusy] = useState(false);
   const [completion, setCompletion] = useState(null);
+  const [editingStops, setEditingStops] = useState(false);
+  const [draftDestinationIds, setDraftDestinationIds] = useState([]);
 
   const numericTripId = Number(tripId);
+
+  const editableStops = useMemo(() => {
+    if (!trip) return [];
+
+    return draftDestinationIds.map((destinationId, index) => {
+      const existingStop = trip.stops?.find(
+        (stop) => Number(stop.destinationId) === Number(destinationId),
+      );
+      if (existingStop) {
+        return { ...existingStop, visitOrder: index + 1 };
+      }
+
+      const destination = destinations?.find(
+        (item) => Number(item.id) === Number(destinationId),
+      );
+      return {
+        stopId: `new-${destinationId}`,
+        destinationId,
+        name: destination?.name ?? "Selected destination",
+        city: destination?.city ?? "",
+        category: destination?.category,
+        visitOrder: index + 1,
+        arrivalDate: trip.startDate,
+        departureDate: trip.endDate,
+      };
+    });
+  }, [destinations, draftDestinationIds, trip]);
+
+  const availableDestinations = (destinations ?? []).filter(
+    (destination) =>
+      !draftDestinationIds.some(
+        (destinationId) => Number(destinationId) === Number(destination.id),
+      ),
+  );
 
   useEffect(() => {
     if (!token || !Number.isFinite(numericTripId)) return;
@@ -62,7 +106,12 @@ export default function TripDetails() {
     setError(null);
     getTripById(token, numericTripId)
       .then((data) => {
-        if (active) setTrip(data);
+        if (active) {
+          setTrip(data);
+          setDraftDestinationIds(
+            (data.stops ?? []).map((stop) => stop.destinationId),
+          );
+        }
       })
       .catch((err) => {
         console.log(err);
@@ -76,6 +125,47 @@ export default function TripDetails() {
       active = false;
     };
   }, [token, numericTripId]);
+
+  const startEditingStops = () => {
+    if (trip.status === "Completed") return;
+    setActionError(null);
+    setDraftDestinationIds(
+      (trip.stops ?? []).map((stop) => stop.destinationId),
+    );
+    setEditingStops(true);
+  };
+
+  const cancelEditingStops = () => {
+    setDraftDestinationIds(
+      (trip.stops ?? []).map((stop) => stop.destinationId),
+    );
+    setActionError(null);
+    setEditingStops(false);
+  };
+
+  const saveEditedStops = async () => {
+    if (draftDestinationIds.length === 0) {
+      setActionError("A trip must contain at least one destination.");
+      return;
+    }
+
+    setActionError(null);
+    setBusy(true);
+    try {
+      const updated = await updateTripDestinationsApi(
+        token,
+        numericTripId,
+        draftDestinationIds,
+      );
+      setTrip(updated);
+      await refreshTrips();
+      setEditingStops(false);
+    } catch (err) {
+      setActionError(err.message || "Could not update the itinerary.");
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const onComplete = async () => {
     setActionError(null);
@@ -147,7 +237,10 @@ export default function TripDetails() {
   return (
     <ThemedView style={styles.container}>
       <ScrollView
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={[
+          styles.scrollContent,
+          { paddingBottom: tabBarClearance + 16 },
+        ]}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.headerRow}>
@@ -207,9 +300,82 @@ export default function TripDetails() {
         <ThemedText title={true} style={styles.sectionTitle}>
           Itinerary
         </ThemedText>
+        {!isCompleted && (
+          <View style={styles.editActions}>
+            {editingStops ? (
+              <>
+                <TouchableOpacity
+                  style={styles.secondaryAction}
+                  onPress={cancelEditingStops}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Cancel itinerary editing"
+                >
+                  <Ionicons name="close-outline" size={16} color={colorTheme.text} />
+                  <Text style={[styles.secondaryActionText, { color: colorTheme.text }]}>Cancel</Text>
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.primaryAction}
+                  onPress={saveEditedStops}
+                  disabled={busy}
+                  accessibilityRole="button"
+                  accessibilityLabel="Save itinerary changes"
+                >
+                  <Ionicons name="checkmark-outline" size={16} color="#fff" />
+                  <Text style={styles.primaryActionText}>{busy ? "Saving..." : "Save changes"}</Text>
+                </TouchableOpacity>
+              </>
+            ) : (
+              <TouchableOpacity
+                style={styles.secondaryAction}
+                onPress={startEditingStops}
+                accessibilityRole="button"
+                accessibilityLabel="Edit itinerary destinations"
+              >
+                <Ionicons name="create-outline" size={16} color={Colors.primary} />
+                <Text style={styles.secondaryActionText}>Edit itinerary</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
         <Spacer height={10} />
 
-        {trip.stops?.map((stop) => (
+        {editingStops && (
+          <View style={styles.addDestinationsSection}>
+            <ThemedText style={styles.addDestinationsLabel}>
+              Add destinations
+            </ThemedText>
+            <View style={styles.availableDestinations}>
+              {availableDestinations.length > 0 ? (
+                availableDestinations.map((destination) => (
+                  <TouchableOpacity
+                    key={destination.id}
+                    style={styles.destinationOption}
+                    onPress={() =>
+                      setDraftDestinationIds((current) => [
+                        ...current,
+                        destination.id,
+                      ])
+                    }
+                    accessibilityRole="button"
+                    accessibilityLabel={`Add ${destination.name} to itinerary`}
+                  >
+                    <Ionicons name="add" size={16} color={Colors.primary} />
+                    <Text style={styles.destinationOptionText}>
+                      {destination.name}
+                    </Text>
+                  </TouchableOpacity>
+                ))
+              ) : (
+                <ThemedText style={styles.noDestinationsText}>
+                  All available destinations are already selected.
+                </ThemedText>
+              )}
+            </View>
+          </View>
+        )}
+
+        {editableStops.map((stop) => (
           <Card key={stop.stopId} style={styles.stopCard} variant="pharaonic">
             <View style={styles.stopRow}>
               <View style={styles.orderBadge}>
@@ -226,6 +392,23 @@ export default function TripDetails() {
                   {shortDate(stop.arrivalDate)} – {shortDate(stop.departureDate)}
                 </ThemedText>
               </View>
+              {editingStops && (
+                <TouchableOpacity
+                  style={styles.removeStopButton}
+                  onPress={() =>
+                    setDraftDestinationIds((current) =>
+                      current.filter(
+                        (destinationId) =>
+                          Number(destinationId) !== Number(stop.destinationId),
+                      ),
+                    )
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={`Remove ${stop.name} from itinerary`}
+                >
+                  <Ionicons name="trash-outline" size={18} color={Colors.warning} />
+                </TouchableOpacity>
+              )}
             </View>
           </Card>
         ))}
@@ -339,6 +522,77 @@ const createStyles = (colorTheme) =>
       fontWeight: "800",
       letterSpacing: 0.3,
     },
+    editActions: {
+      flexDirection: "row",
+      justifyContent: "flex-end",
+      gap: 8,
+      marginTop: 10,
+    },
+    primaryAction: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      backgroundColor: Colors.primary,
+    },
+    primaryActionText: {
+      color: "#fff",
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    secondaryAction: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 5,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      borderRadius: 10,
+      borderWidth: 1,
+      borderColor: Colors.primary,
+    },
+    secondaryActionText: {
+      color: Colors.primary,
+      fontSize: 12,
+      fontWeight: "700",
+    },
+    addDestinationsSection: {
+      marginBottom: 12,
+      padding: 12,
+      borderRadius: 12,
+      backgroundColor: colorTheme.uiBackground,
+      borderWidth: 1,
+      borderColor: colorTheme.border,
+    },
+    addDestinationsLabel: {
+      fontSize: 13,
+      fontWeight: "700",
+      marginBottom: 8,
+    },
+    availableDestinations: {
+      flexDirection: "row",
+      flexWrap: "wrap",
+      gap: 8,
+    },
+    destinationOption: {
+      flexDirection: "row",
+      alignItems: "center",
+      maxWidth: "100%",
+      paddingHorizontal: 9,
+      paddingVertical: 7,
+      borderRadius: 9,
+      backgroundColor: "rgba(2, 132, 199, 0.1)",
+    },
+    destinationOptionText: {
+      flexShrink: 1,
+      color: Colors.primary,
+      fontSize: 12,
+      fontWeight: "600",
+    },
+    noDestinationsText: {
+      fontSize: 12,
+    },
     stopCard: {
       marginBottom: 10,
       padding: 14,
@@ -377,6 +631,11 @@ const createStyles = (colorTheme) =>
     stopDates: {
       fontSize: 12,
       marginTop: 4,
+    },
+    removeStopButton: {
+      padding: 8,
+      borderRadius: 10,
+      backgroundColor: "rgba(239, 68, 68, 0.1)",
     },
     completeButton: {
       paddingVertical: 16,
