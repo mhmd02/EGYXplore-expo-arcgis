@@ -17,6 +17,8 @@ export default function CustomPopup({
   layerInfo,
   onClose,
   onNavigate,
+  onToggleDraft,
+  isInDraft,
   colorTheme,
 }) {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
@@ -30,8 +32,14 @@ export default function CustomPopup({
     const city = data.Governorate || "Unknown City";
     const category = data.Category || "General";
     const rating = data.Rating;
+    const rawPrice = data.ForeignPrice ?? data.TicketPrice;
     const ticketPrice =
-      data.TicketPrice === 0 ? "Free Entry" : `${data.ForeignPrice} EGP`;
+      rawPrice === 0
+        ? "Free Entry"
+        : rawPrice != null
+          ? `${rawPrice} EGP`
+          : "Price unavailable";
+    const addedToDraft = isInDraft?.(data) ?? false;
     const destinationsImages =
       typeof data.Images === "string"
         ? data.Images.split("|")
@@ -96,6 +104,27 @@ export default function CustomPopup({
               >
                 <Text style={styles.detailsButtonText}>View Details</Text>
                 <Ionicons name="arrow-forward" size={16} color="#fff" />
+              </TouchableOpacity>
+            )}
+            {onToggleDraft && (
+              <TouchableOpacity
+                style={[
+                  styles.itineraryButton,
+                  addedToDraft && styles.itineraryButtonAdded,
+                ]}
+                onPress={() => onToggleDraft(data)}
+                activeOpacity={0.8}
+                accessibilityRole="button"
+                accessibilityLabel={`${addedToDraft ? "Remove" : "Add"} ${name} ${addedToDraft ? "from" : "to"} itinerary`}
+              >
+                <Ionicons
+                  name={addedToDraft ? "checkmark-circle" : "add-circle-outline"}
+                  size={18}
+                  color={addedToDraft ? "#10B981" : "#3B82F6"}
+                />
+                <Text style={styles.itineraryButtonText}>
+                  {addedToDraft ? "Added to Itinerary" : "Add to Itinerary"}
+                </Text>
               </TouchableOpacity>
             )}
             <View style={styles.swipeIndicator}>
@@ -170,6 +199,25 @@ export default function CustomPopup({
       </View>
     );
   }
+
+  if (Id === "geocoder") {
+    return (
+      <View style={styles.branchesOverlay}>
+        <View style={styles.branchesPopupContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close-circle" color="#94A3B8" size={28} />
+          </TouchableOpacity>
+          <Text style={styles.title}>{data.Name || "Selected place"}</Text>
+          <View style={styles.divider} />
+          <Text style={styles.infoText}>
+            This is a searched place. Select a destination or branch marker for
+            tourism details.
+          </Text>
+        </View>
+      </View>
+    );
+  }
+
   return null;
 }
 
@@ -307,6 +355,27 @@ const createStyles = (colorTheme) =>
     detailsButtonText: {
       color: "#fff",
       fontSize: 15,
+      fontWeight: "700",
+    },
+    itineraryButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 7,
+      paddingVertical: 11,
+      paddingHorizontal: 16,
+      borderRadius: 14,
+      marginTop: 10,
+      borderWidth: 1,
+      borderColor: "#3B82F6",
+    },
+    itineraryButtonAdded: {
+      borderColor: "#10B981",
+      backgroundColor: "rgba(16, 185, 129, 0.1)",
+    },
+    itineraryButtonText: {
+      color: colorTheme.text,
+      fontSize: 14,
       fontWeight: "700",
     },
   });

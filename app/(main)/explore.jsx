@@ -32,6 +32,7 @@ import ThemedView from "../../components/ThemedView";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import CustomPopup from "../../components/CustomPopup.jsx";
 import { ThemeContext } from "../../context/ThemeContext";
+import { useTripDraft } from "../../context/TripDraftContext";
 import { Colors } from "../../constants/Colors";
 import {
   ARCGIS_API_KEY,
@@ -82,6 +83,22 @@ const sanitizeSearchTerm = (input) => {
   return input.replace(/'/g, "''");
 };
 
+const createLabelConfig = (field, colorTheme) => [
+  {
+    expression: `IIF($view.scale <= 15000, $feature.${field}, '')`,
+    useArcade: true,
+    symbol: {
+      type: "text",
+      color: colorTheme.mapLabelText,
+      size: 10,
+      haloColor: colorTheme.mapLabelHalo,
+      haloWidth: 1.5,
+      verticalAlignment: "baseline",
+      fontFamily: "sans-serif-medium",
+    },
+  },
+];
+
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -99,6 +116,8 @@ export default function Explore() {
   const [layerInfo, setLayerInfo] = useState(null);
   const [highlightGraphic, setHighlightGraphic] = useState(null);
   const [mapViewpoint, setMapViewpoint] = useState(null);
+  const [mapStatus, setMapStatus] = useState("loading");
+  const [mapError, setMapError] = useState(null);
 
   // Filter states
   const [showLandmarks, setShowLandmarks] = useState(true);
@@ -108,8 +127,13 @@ export default function Explore() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { isInDraft, toggleDraft } = useTripDraft();
 
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
+  const mapConfigurationMissing =
+    !ARCGIS_API_KEY ||
+    !ARCGIS_LICENSE_KEY ||
+    (!FEATURE_LAYERS.destination && !FEATURE_LAYERS.branches);
 
   // Dynamic renderers connected to ThemeContext, wrapped in useMemo for optimal performance
   const destinationRenderer = useMemo(
@@ -140,22 +164,12 @@ export default function Explore() {
     [colorTheme.mapBranch],
   );
 
-  const labelConfig = useMemo(
-    () => [
-      {
-        expression: "IIF($view.scale <= 15000, $feature.Name, '')",
-        useArcade: true,
-        symbol: {
-          type: "text",
-          color: colorTheme.mapLabelText,
-          size: 10,
-          haloColor: colorTheme.mapLabelHalo,
-          haloWidth: 1.5,
-          verticalAlignment: "baseline",
-          fontFamily: "sans-serif-medium",
-        },
-      },
-    ],
+  const destinationLabelConfig = useMemo(
+    () => createLabelConfig(LAYER_FIELDS.destination, colorTheme),
+    [colorTheme],
+  );
+  const branchLabelConfig = useMemo(
+    () => createLabelConfig(LAYER_FIELDS.branches, colorTheme),
     [colorTheme.mapLabelText, colorTheme.mapLabelHalo],
   );
 
@@ -294,7 +308,15 @@ export default function Explore() {
     }
   };
 
-  const handleSearch = async (overrideQuery = null) => {
+  const clearMapSelection = () => {
+    setSelectedFeature(null);
+    setClickLocation(null);
+    setSearchPoint(null);
+    setLayerInfo(null);
+    setHighlightGraphic(null);
+  };
+
+  const handleSearch = async (overrideQuery = null, preferredType = null) => {
     Keyboard.dismiss(); // Hides the keyboard
     const queryToUse =
       typeof overrideQuery === "string" ? overrideQuery : searchQuery;
@@ -309,10 +331,26 @@ export default function Explore() {
       const destWhere = `LOWER(${LAYER_FIELDS.destination}) LIKE '%${term}%'`;
       const branchWhere = `LOWER(${LAYER_FIELDS.branches}) LIKE '%${term}%'`;
       // 1. Search local Destinations first
-      if (destLayerRef.current) {
+      if (destLayerRef.current && preferredType !== "branch") {
         const destResults = await destLayerRef.current.queryFeatures({
           whereClause: destWhere,
         });
+        if (destResults && destResults.length > 1 && !preferredType) {
+          const matches = Array.from(
+            new Map(
+              destResults.map((feature) => [
+                feature.attributes[LAYER_FIELDS.destination],
+                {
+                  name: feature.attributes[LAYER_FIELDS.destination],
+                  type: "landmark",
+                },
+              ]),
+            ).values(),
+          ).slice(0, 5);
+          setSuggestions(matches);
+          setShowSuggestions(true);
+          return;
+        }
         if (destResults && destResults.length > 0) {
           const feature = destResults[0];
           const pt = feature.geometry;
@@ -322,13 +360,13 @@ export default function Explore() {
             if (projectedPt) {
               const lat = projectedPt.y;
               const lon = projectedPt.x;
+              clearMapSelection();
               setMapViewpoint({ latitude: lat, longitude: lon, scale: 15000 });
               setSearchPoint({ latitude: lat, longitude: lon });
               setClickLocation({ latitude: lat, longitude: lon });
               setSelectedFeature(feature.attributes);
               setLayerInfo("destination");
               setShowLandmarks(true); // Automatically unhide the layer if it was off!
-              setIsSearching(false);
               return;
             }
           }
@@ -336,10 +374,26 @@ export default function Explore() {
       }
 
       // 2. Search local Branches next
-      if (branchesLayerRef.current) {
+      if (branchesLayerRef.current && preferredType !== "landmark") {
         const branchResults = await branchesLayerRef.current.queryFeatures({
           whereClause: branchWhere,
         });
+        if (branchResults && branchResults.length > 1 && !preferredType) {
+          const matches = Array.from(
+            new Map(
+              branchResults.map((feature) => [
+                feature.attributes[LAYER_FIELDS.branches],
+                {
+                  name: feature.attributes[LAYER_FIELDS.branches],
+                  type: "branch",
+                },
+              ]),
+            ).values(),
+          ).slice(0, 5);
+          setSuggestions(matches);
+          setShowSuggestions(true);
+          return;
+        }
         if (branchResults && branchResults.length > 0) {
           const feature = branchResults[0];
           const pt = feature.geometry;
@@ -349,13 +403,13 @@ export default function Explore() {
             if (projectedPt) {
               const lat = projectedPt.y;
               const lon = projectedPt.x;
+              clearMapSelection();
               setMapViewpoint({ latitude: lat, longitude: lon, scale: 15000 });
               setSearchPoint({ latitude: lat, longitude: lon });
               setClickLocation({ latitude: lat, longitude: lon });
               setSelectedFeature(feature.attributes);
               setLayerInfo("branches");
               setShowBranches(true); // Automatically unhide the layer if it was off!
-              setIsSearching(false);
               return;
             }
           }
@@ -377,6 +431,7 @@ export default function Explore() {
 
       const pt = bestMatch.location;
       if (pt) {
+        clearMapSelection();
         // Extract the exact coordinates
         const lat = pt.y || pt.latitude;
         const lon = pt.x || pt.longitude;
@@ -393,7 +448,7 @@ export default function Explore() {
         // 3. Open the popup at that location
         setClickLocation({ latitude: lat, longitude: lon });
         setSelectedFeature({ Name: bestMatch.label }); // Shows the place name in the popup
-        setLayerInfo(null); // It's a general place, not a metro station
+        setLayerInfo("geocoder");
       }
     } catch (err) {
       console.warn("Search Error:", err);
@@ -470,11 +525,7 @@ export default function Explore() {
         }
       } else {
         // Tapped empty space -> clear selection (DESELECT_ALL).
-        setSelectedFeature(null);
-        setClickLocation(null);
-        setLayerInfo(null);
-        setSearchPoint(null);
-        setHighlightGraphic(null);
+        clearMapSelection();
       }
     } catch (e) {
       console.warn("Identify error:", e);
@@ -524,7 +575,7 @@ export default function Explore() {
                   url={FEATURE_LAYERS.destination}
                   renderer={destinationRenderer}
                   labelsEnabled={true}
-                  labels={labelConfig}
+                  labels={destinationLabelConfig}
                 />
               )}
               {FEATURE_LAYERS.branches && (
@@ -534,7 +585,7 @@ export default function Explore() {
                   url={FEATURE_LAYERS.branches}
                   renderer={branchesRenderer}
                   labelsEnabled={true}
-                  labels={labelConfig}
+                  labels={branchLabelConfig}
                 />
               )}
               <MapView
@@ -542,6 +593,16 @@ export default function Explore() {
                 style={styles.map}
                 viewpoint={mapViewpoint}
                 onTap={handleMapTap}
+                onMapLoaded={() => {
+                  setMapStatus("ready");
+                  setMapError(null);
+                }}
+                onMapLoadError={(event) => {
+                  setMapStatus("error");
+                  setMapError(
+                    event.nativeEvent?.message || "The map could not be loaded.",
+                  );
+                }}
                 locationDisplay={
                   hasLocationPermission
                     ? { showLocation: true, autoPanMode: "off" }
@@ -577,10 +638,7 @@ export default function Explore() {
               location={clickLocation}
               layerInfo={layerInfo}
               onClose={() => {
-                setSelectedFeature(null);
-                setClickLocation(null);
-                setSearchPoint(null);
-                setHighlightGraphic(null);
+                clearMapSelection();
               }}
               onNavigate={(featureData) => {
                 const destinationId = Number(featureData?.Id);
@@ -593,15 +651,69 @@ export default function Explore() {
                   return;
                 }
 
-                setSelectedFeature(null);
-                setClickLocation(null);
-                setSearchPoint(null);
-                setHighlightGraphic(null);
+                clearMapSelection();
                 router.push(`/trips/${destinationId}`);
               }}
+              onToggleDraft={(featureData) => {
+                const destinationId = Number(featureData?.Id);
+                if (!Number.isInteger(destinationId) || destinationId <= 0) {
+                  Alert.alert(
+                    "Destination unavailable",
+                    "This destination cannot be added to an itinerary.",
+                  );
+                  return;
+                }
+                toggleDraft(destinationId);
+              }}
+              isInDraft={(featureData) =>
+                isInDraft(Number(featureData?.Id))
+              }
               colorTheme={colorTheme}
             />
           )}
+          {mapStatus === "loading" && !mapConfigurationMissing && (
+            <View
+              style={[
+                styles.mapStatusCard,
+                { backgroundColor: colorTheme.uiBackground },
+              ]}
+            >
+              <ActivityIndicator size="small" color={Colors.primary} />
+              <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
+                Loading map...
+              </Text>
+            </View>
+          )}
+          {mapStatus === "error" && (
+            <View
+              style={[
+                styles.mapStatusCard,
+                { backgroundColor: colorTheme.uiBackground },
+              ]}
+            >
+              <Ionicons name="warning-outline" size={20} color={Colors.warning} />
+              <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
+                {mapError || "Map data is unavailable."}
+              </Text>
+            </View>
+          )}
+          {mapStatus !== "error" && mapConfigurationMissing && (
+              <View
+                style={[
+                  styles.mapStatusCard,
+                  { backgroundColor: colorTheme.uiBackground },
+                ]}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color={Colors.primary}
+                />
+                <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
+                  Map layers are not configured. Check your ArcGIS environment settings.
+                </Text>
+              </View>
+            )}
         </View>
 
         {/* Floating Search Container - Cleanly positioned below the request bar */}
@@ -642,9 +754,7 @@ export default function Explore() {
                   <TouchableOpacity
                     onPress={() => {
                       setSearchQuery("");
-                      setSearchPoint(null);
-                      setSelectedFeature(null);
-                      setClickLocation(null);
+                      clearMapSelection();
                     }}
                     style={styles.iconButton}
                   >
@@ -693,7 +803,7 @@ export default function Explore() {
                     onPress={() => {
                       setSearchQuery(item.name);
                       setShowSuggestions(false);
-                      handleSearch(item.name);
+                       handleSearch(item.name, item.type);
                     }}
                   >
                     <Ionicons
@@ -764,7 +874,7 @@ export default function Explore() {
                       showBranches && { color: colorTheme.mapText },
                     ]}
                   >
-                    Near me "Branches"
+                    Branches
                   </Text>
                 </TouchableOpacity>
               </ScrollView>
@@ -796,6 +906,29 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     overflow: "hidden",
+  },
+  mapStatusCard: {
+    position: "absolute",
+    top: 116,
+    left: 16,
+    right: 16,
+    zIndex: 5,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 12,
+    backgroundColor: "rgba(255, 255, 255, 0.94)",
+    shadowColor: "#000",
+    shadowOpacity: 0.12,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  mapStatusText: {
+    flex: 1,
+    fontSize: 12,
+    fontWeight: "600",
   },
   map: {
     flex: 1,
