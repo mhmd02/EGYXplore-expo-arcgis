@@ -19,6 +19,8 @@ export default function CustomPopup({
   onNavigate,
   onToggleDraft,
   isInDraft,
+  draftStopNumber,
+  draftCount,
   colorTheme,
 }) {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
@@ -118,12 +120,16 @@ export default function CustomPopup({
                 accessibilityLabel={`${addedToDraft ? "Remove" : "Add"} ${name} ${addedToDraft ? "from" : "to"} itinerary`}
               >
                 <Ionicons
-                  name={addedToDraft ? "checkmark-circle" : "add-circle-outline"}
+                  name={
+                    addedToDraft ? "checkmark-circle" : "add-circle-outline"
+                  }
                   size={18}
                   color={addedToDraft ? "#10B981" : "#3B82F6"}
                 />
                 <Text style={styles.itineraryButtonText}>
-                  {addedToDraft ? "Added to Itinerary" : "Add to Itinerary"}
+                  {addedToDraft
+                    ? `Stop #${draftStopNumber} — Remove`
+                    : "Add to Itinerary"}
                 </Text>
               </TouchableOpacity>
             )}

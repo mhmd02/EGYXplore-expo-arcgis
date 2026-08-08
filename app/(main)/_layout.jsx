@@ -13,6 +13,8 @@ import { SettingsContext } from "../../context/SettingsContext";
 import { useUser } from "../../context/UserContext";
 import CustomThemedLoader from "../../components/CustomThemedLoader";
 import { ContentContext } from "../../context/ContentContext";
+import { useTripDraft } from "../../context/TripDraftContext";
+import { Text } from "react-native";
 
 export default function MainLayout() {
   const { theme } = useContext(ThemeContext);
@@ -28,6 +30,7 @@ export default function MainLayout() {
 
   const insets = useSafeAreaInsets();
   const { token, user, isLoading } = useUser();
+  const { draftCount } = useTripDraft();
 
   if (isLoading) {
     return <CustomThemedLoader />;
@@ -91,11 +94,18 @@ export default function MainLayout() {
         options={{
           title: "Sanctuaries",
           tabBarIcon: ({ focused, color }) => (
-            <Ionicons
-              name={focused ? "map" : "map-outline"}
-              size={24}
-              color={colorTheme.title}
-            />
+            <View style={styles.iconContainer}>
+              <Ionicons
+                name={focused ? "map" : "map-outline"}
+                size={24}
+                color={colorTheme.title}
+              />
+              {draftCount > 0 && (
+                <View style={styles.numberedBadge}>
+                  <Text style={styles.numberedBadgeText}>{draftCount}</Text>
+                </View>
+              )}
+            </View>
           ),
         }}
       />
@@ -171,5 +181,22 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: "#0284C7",
+  },
+  numberedBadge: {
+    position: "absolute",
+    top: -4,
+    right: -10,
+    backgroundColor: "#EF4444",
+    minWidth: 16,
+    height: 16,
+    borderRadius: 8,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingHorizontal: 4,
+  },
+  numberedBadgeText: {
+    color: "#FFFFFF",
+    fontSize: 10,
+    fontWeight: "bold",
   },
 });
