@@ -5,6 +5,8 @@ import {
   ScrollView,
   TouchableOpacity,
   Keyboard,
+  Alert,
+  ActivityIndicator,
 } from "react-native";
 import { ThemeContext } from "../../../context/ThemeContext";
 import { useUser } from "../../../context/UserContext";
@@ -14,6 +16,7 @@ import ThemedView from "../../../components/ThemedView";
 import ThemedText from "../../../components/ThemedText";
 import ThemedTextInput from "../../../components/ThemedTextInput";
 import ThemedButton from "../../../components/ThemedButton";
+import { updateProfile } from "../../../api/profileApi";
 
 // Fields that map 1:1 to the registration form
 const FIELDS = [
@@ -29,10 +32,11 @@ export default function PersonalInfo() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
-  const { user, updateUser } = useUser();
+  const { user, token, updateUser } = useUser();
 
   const [editing, setEditing] = useState(false);
   const [form, setForm] = useState(user);
+  const [saving, setSaving] = useState(false);
 
   // Fix #4: Keep form in sync if the global user object updates
   // (e.g., from an API call) when not currently editing
@@ -61,10 +65,18 @@ export default function PersonalInfo() {
     setEditing((prev) => !prev);
   };
 
-  const handleSave = () => {
-    updateUser(form);
-    setEditing(false);
-    Keyboard.dismiss();
+  const handleSave = async () => {
+    setSaving(true);
+    try {
+      const updatedUser = await updateProfile(token, form);
+      await updateUser(updatedUser);
+      setEditing(false);
+      Keyboard.dismiss();
+    } catch (error) {
+      Alert.alert("Save Failed", error.message || "Could not update your profile.");
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -100,7 +112,7 @@ export default function PersonalInfo() {
               {editing ? (
                 <ThemedTextInput
                   style={styles.input}
-                  value={form[field.key]}
+                  value={form?.[field.key] ?? ""}
                   onChangeText={(t) => setField(field.key, t)}
                   keyboardType={field.keyboardType}
                   placeholder={field.label}
@@ -113,7 +125,7 @@ export default function PersonalInfo() {
                 />
               ) : (
                 <ThemedText style={styles.fieldValue}>
-                  {form[field.key] || "—"}
+                   {form?.[field.key] || "—"}
                 </ThemedText>
               )}
             </View>
@@ -157,8 +169,12 @@ export default function PersonalInfo() {
 
         {/* Save appears only in edit mode */}
         {editing && (
-          <ThemedButton style={styles.saveButton} onPress={handleSave}>
-            <ThemedText style={styles.saveText}>Save Changes</ThemedText>
+          <ThemedButton style={styles.saveButton} onPress={handleSave} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator color="#fff" />
+            ) : (
+              <ThemedText style={styles.saveText}>Save Changes</ThemedText>
+            )}
           </ThemedButton>
         )}
       </ScrollView>
