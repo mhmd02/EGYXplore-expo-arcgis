@@ -1,4 +1,4 @@
-import { useContext, useEffect, useMemo, useState } from "react";
+import { useCallback, useContext, useEffect, useMemo, useState } from "react";
 import {
   View,
   StyleSheet,
@@ -9,7 +9,7 @@ import {
   Text,
   ActivityIndicator,
 } from "react-native";
-import { useRouter } from "expo-router";
+import { useFocusEffect, useRouter } from "expo-router";
 import * as ImagePicker from "expo-image-picker";
 import { Ionicons } from "@expo/vector-icons";
 import { ThemeContext } from "../../../context/ThemeContext";
@@ -27,27 +27,35 @@ export default function Account() {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const router = useRouter();
   const { totalPoints, redemptions, completedIds } = useProgress();
-  const { user, token, logout, updateUser } = useUser();
+  const { user, token, logout, updateUser, refreshProfile } = useUser();
   const [helpVisible, setHelpVisible] = useState(false);
   const [avatarLoadFailed, setAvatarLoadFailed] = useState(false);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
 
-  // Mock data for gamification to match website profile
-  const level = user?.level || 5;
-  const levelLabel = user?.levelLabel || "Explorer";
-  const currentXP = user?.currentXP || 1250;
-  const nextLevelXP = user?.nextLevelXP || 2000;
+  // Default to a brand new user (Level 1, 0 XP) instead of the mock data
+  const level = user?.level ?? 1;
+  const levelLabel = user?.levelLabel ?? "Novice Explorer";
+  const currentXP = user?.currentXP ?? 0;
+  const nextLevelXP = user?.nextLevelXP ?? 100;
   const progressPercent = Math.min((currentXP / nextLevelXP) * 100, 100);
 
-  const placesVisited = user?.placesVisited || 12;
-  const missionsCompleted = completedIds?.length || 0;
-  const badgesEarned = user?.badgesEarned || 4;
-  const loginStreak = user?.loginStreak || 5;
-  const featuredBadge = user?.featuredBadge || "Pharaoh's Blessing";
+  const placesVisited = user?.placesVisited ?? 0;
+  const missionsCompleted = completedIds?.length ?? 0;
+  const badgesEarned = user?.badgesEarned ?? 0;
+  const loginStreak = user?.loginStreak ?? 0;
+  const featuredBadge = user?.featuredBadge ?? "Novice Explorer";
 
   useEffect(() => {
     setAvatarLoadFailed(false);
   }, [user?.profilePictureUrl]);
+
+  useFocusEffect(
+    useCallback(() => {
+      refreshProfile().catch((error) => {
+        console.warn("Could not refresh account profile:", error.message);
+      });
+    }, [refreshProfile]),
+  );
 
   if (!user) {
     return null; // or a loading spinner, or redirect — see note below

@@ -1,6 +1,25 @@
 import { File } from "expo-file-system";
 import { API_BASE_URL } from "./api";
 
+export async function getProfile(token) {
+  if (!token) {
+    throw new Error("Please log in before loading your profile.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/MobileAccount/profile`, {
+    headers: {
+      Authorization: `Bearer ${token}`,
+    },
+  });
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result.success || !result.user) {
+    throw new Error(result.message || "Could not load your profile.");
+  }
+
+  return result.user;
+}
+
 export async function uploadProfilePicture(token, imageUri) {
   if (!token) {
     throw new Error("Please log in before uploading a profile picture.");
