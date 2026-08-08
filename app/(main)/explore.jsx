@@ -127,7 +127,7 @@ export default function Explore() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
-  const { isInDraft, toggleDraft } = useTripDraft();
+  const { isInDraft, toggleDraft, draftIds, draftCount } = useTripDraft();
 
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
   const mapConfigurationMissing =
@@ -600,7 +600,8 @@ export default function Explore() {
                 onMapLoadError={(event) => {
                   setMapStatus("error");
                   setMapError(
-                    event.nativeEvent?.message || "The map could not be loaded.",
+                    event.nativeEvent?.message ||
+                      "The map could not be loaded.",
                   );
                 }}
                 locationDisplay={
@@ -665,9 +666,13 @@ export default function Explore() {
                 }
                 toggleDraft(destinationId);
               }}
-              isInDraft={(featureData) =>
-                isInDraft(Number(featureData?.Id))
+              isInDraft={(featureData) => isInDraft(Number(featureData?.Id))}
+              draftStopNumber={
+                selectedFeature
+                  ? draftIds.indexOf(Number(selectedFeature?.Id)) + 1
+                  : 0
               }
+              draftCount={draftCount}
               colorTheme={colorTheme}
             />
           )}
@@ -691,29 +696,34 @@ export default function Explore() {
                 { backgroundColor: colorTheme.uiBackground },
               ]}
             >
-              <Ionicons name="warning-outline" size={20} color={Colors.warning} />
+              <Ionicons
+                name="warning-outline"
+                size={20}
+                color={Colors.warning}
+              />
               <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
                 {mapError || "Map data is unavailable."}
               </Text>
             </View>
           )}
           {mapStatus !== "error" && mapConfigurationMissing && (
-              <View
-                style={[
-                  styles.mapStatusCard,
-                  { backgroundColor: colorTheme.uiBackground },
-                ]}
-              >
-                <Ionicons
-                  name="information-circle-outline"
-                  size={20}
-                  color={Colors.primary}
-                />
-                <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
-                  Map layers are not configured. Check your ArcGIS environment settings.
-                </Text>
-              </View>
-            )}
+            <View
+              style={[
+                styles.mapStatusCard,
+                { backgroundColor: colorTheme.uiBackground },
+              ]}
+            >
+              <Ionicons
+                name="information-circle-outline"
+                size={20}
+                color={Colors.primary}
+              />
+              <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
+                Map layers are not configured. Check your ArcGIS environment
+                settings.
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Floating Search Container - Cleanly positioned below the request bar */}
@@ -803,7 +813,7 @@ export default function Explore() {
                     onPress={() => {
                       setSearchQuery(item.name);
                       setShowSuggestions(false);
-                       handleSearch(item.name, item.type);
+                      handleSearch(item.name, item.type);
                     }}
                   >
                     <Ionicons
