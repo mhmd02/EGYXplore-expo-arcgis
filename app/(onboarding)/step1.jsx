@@ -6,6 +6,7 @@ import {
   Text,
   View,
   TouchableOpacity,
+  ActivityIndicator,
 } from "react-native";
 import { useRouter } from "expo-router";
 import ThemedView from "../../components/ThemedView";
@@ -15,14 +16,17 @@ import { Colors } from "../../constants/Colors";
 import { INTEREST_OPTIONS } from "../../constants/user";
 import { ThemeContext } from "../../context/ThemeContext";
 import { useUser } from "../../context/UserContext";
+import { updateProfile } from "../../api/profileApi";
 
 export default function Step1() {
   const router = useRouter();
   const [selectedInterests, setSelectedInterests] = useState([]);
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState(null);
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] || Colors.light;
 
-  const { updateUser } = useUser();
+  const { token, updateUser } = useUser();
 
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
 
@@ -31,6 +35,22 @@ export default function Step1() {
       setSelectedInterests(selectedInterests.filter((i) => i !== interest));
     } else {
       setSelectedInterests([...selectedInterests, interest]);
+    }
+  };
+
+  const handleNext = async () => {
+    setSaving(true);
+    setSaveError(null);
+    try {
+      const updatedUser = await updateProfile(token, {
+        interests: selectedInterests,
+      });
+      await updateUser(updatedUser);
+      router.push("/step2");
+    } catch (error) {
+      setSaveError(error.message || "Could not save your interests.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -106,22 +126,26 @@ export default function Step1() {
         </View>
 
         <View style={styles.buttonRowContainer}>
+          {saveError && <Text style={styles.errorText}>{saveError}</Text>}
           <TouchableOpacity
             style={styles.linkButtonAlternative}
             onPress={() => router.replace("/explore")}
+            disabled={saving}
           >
             <Text style={{ color: colorTheme.text, fontWeight: "500" }}>
               Skip All
             </Text>
           </TouchableOpacity>
           <TouchableOpacity
-            style={styles.linkButton}
-            onPress={() => {
-              updateUser({ interests: selectedInterests });
-              router.push("/step2");
-            }}
+            style={[styles.linkButton, saving && styles.disabledButton]}
+            onPress={handleNext}
+            disabled={saving}
           >
-            <Text style={{ color: "#FFF", fontWeight: "bold" }}>Next</Text>
+            {saving ? (
+              <ActivityIndicator color="#FFF" />
+            ) : (
+              <Text style={{ color: "#FFF", fontWeight: "bold" }}>Next</Text>
+            )}
           </TouchableOpacity>
         </View>
       </ThemedView>
@@ -214,6 +238,7 @@ const createStyles = (colorTheme) =>
     // Bottom Buttons dynamic layout styling
     buttonRowContainer: {
       flexDirection: "row",
+      flexWrap: "wrap",
       justifyContent: "space-between",
       alignItems: "center",
       marginTop: "auto", // Automatically pushes the button container row down to the bottom
@@ -226,6 +251,16 @@ const createStyles = (colorTheme) =>
       borderRadius: 25,
       textAlign: "center", // Essential because Link acts as a Text wrapper natively
       transform: [{ scale: 1 }],
+    },
+    disabledButton: {
+      opacity: 0.65,
+    },
+    errorText: {
+      width: "100%",
+      color: Colors.danger ?? "#DC2626",
+      fontSize: 13,
+      marginBottom: 10,
+      textAlign: "center",
     },
     linkButtonPressed: {
       opacity: 0.7, // Mimics TouchableOpacity

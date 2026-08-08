@@ -20,6 +20,33 @@ export async function getProfile(token) {
   return result.user;
 }
 
+export async function updateProfile(token, profile) {
+  if (!token) {
+    throw new Error("Please log in before updating your profile.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/MobileAccount/profile`, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({
+      firstName: profile.firstName,
+      lastName: profile.lastName,
+      country: profile.country,
+      interests: profile.interests ?? [],
+    }),
+  });
+  const result = await response.json().catch(() => ({}));
+
+  if (!response.ok || !result.success || !result.user) {
+    throw new Error(result.message || "Could not update your profile.");
+  }
+
+  return result.user;
+}
+
 export async function uploadProfilePicture(token, imageUri) {
   if (!token) {
     throw new Error("Please log in before uploading a profile picture.");
