@@ -296,6 +296,30 @@ export default function TripDetails() {
           )}
         </Card>
 
+        <TouchableOpacity
+          style={[
+            styles.routeButton,
+            (!trip.stops || trip.stops.length < 2) && styles.buttonDisabled,
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: "/explore",
+              params: { mode: "saved-trip", tripId: String(numericTripId) },
+            })
+          }
+          disabled={!trip.stops || trip.stops.length < 2}
+          accessibilityRole="button"
+          accessibilityLabel="Show trip route"
+        >
+          <Ionicons name="map-outline" size={18} color="#fff" />
+          <Text style={styles.routeButtonText}>Show Trip Route</Text>
+        </TouchableOpacity>
+        {(!trip.stops || trip.stops.length < 2) && (
+          <Text style={styles.routeHint}>
+            Add at least two destinations to view a route.
+          </Text>
+        )}
+
         <Spacer height={20} />
         <ThemedText title={true} style={styles.sectionTitle}>
           Itinerary
@@ -516,6 +540,27 @@ const createStyles = (colorTheme) =>
     summaryText: {
       fontSize: 14,
       fontWeight: "600",
+    },
+    routeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 14,
+      paddingVertical: 13,
+      borderRadius: 12,
+      backgroundColor: Colors.primary,
+    },
+    routeButtonText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    routeHint: {
+      marginTop: 6,
+      textAlign: "center",
+      fontSize: 12,
+      color: colorTheme.placeholder,
     },
     sectionTitle: {
       fontSize: 20,

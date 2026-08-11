@@ -25,18 +25,28 @@ import {
 } from "expo-arcgis";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import * as Location from "expo-location";
 
 import ThemedView from "../../components/ThemedView";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import CustomPopup from "../../components/CustomPopup.jsx";
+import TripRouteOverlay from "../../components/TripRouteOverlay";
+import TripRoutePanel from "../../components/TripRoutePanel";
 import { ThemeContext } from "../../context/ThemeContext";
 import { useTripDraft } from "../../context/TripDraftContext";
+import { useUser } from "../../context/UserContext";
 import { Colors } from "../../constants/Colors";
+import { getTripById } from "../../api/tripApi";
+import {
+  normalizeTripStops,
+  solveTripRoute,
+  TripRouteError,
+} from "../../services/tripRouteService";
 import {
   ARCGIS_API_KEY,
   ARCGIS_LICENSE_KEY,
+  ARCGIS_ROUTE_SERVICE_URL,
   FEATURE_LAYERS,
   MAP_CENTER,
   DESTINATIONS_PORTAL_ID,
@@ -127,7 +137,80 @@ export default function Explore() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode, tripId } = useLocalSearchParams();
+  const { token } = useUser();
   const { isInDraft, toggleDraft, draftIds, draftCount } = useTripDraft();
+  const isTripRouteMode = mode === "saved-trip" && Boolean(tripId);
+  const tripRouteRequest = useRef(0);
+  const [tripRoute, setTripRoute] = useState(null);
+  const [tripRouteInfo, setTripRouteInfo] = useState(null);
+  const [tripRouteLoading, setTripRouteLoading] = useState(false);
+  const [tripRouteError, setTripRouteError] = useState(null);
+
+  const loadTripRoute = async () => {
+    const requestId = ++tripRouteRequest.current;
+    const numericTripId = Number(tripId);
+    if (!token || !Number.isInteger(numericTripId) || numericTripId <= 0) {
+      setTripRouteError("This trip could not be loaded.");
+      return;
+    }
+
+    setTripRouteLoading(true);
+    setTripRouteError(null);
+    try {
+      const trip = await getTripById(token, numericTripId);
+      const stops = normalizeTripStops(trip.stops);
+      const route = await solveTripRoute(stops, {
+        routeServiceUrl: ARCGIS_ROUTE_SERVICE_URL,
+      });
+      if (requestId !== tripRouteRequest.current) return;
+      setTripRouteInfo(trip);
+      setTripRoute(route);
+      const latitudes = stops.map((stop) => stop.latitude);
+      const longitudes = stops.map((stop) => stop.longitude);
+      const latitudeSpan = Math.max(...latitudes) - Math.min(...latitudes);
+      const longitudeSpan = Math.max(...longitudes) - Math.min(...longitudes);
+      const largestSpan = Math.max(latitudeSpan, longitudeSpan);
+      setMapViewpoint({
+        latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+        longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+        scale: Math.max(25000, Math.min(2500000, largestSpan * 3000000)),
+      });
+    } catch (error) {
+      if (requestId !== tripRouteRequest.current) return;
+      setTripRoute(null);
+      setTripRouteError(
+        error instanceof TripRouteError
+          ? error.message
+          : "Unable to calculate this trip route.",
+      );
+    } finally {
+      if (requestId === tripRouteRequest.current) setTripRouteLoading(false);
+    }
+  };
+
+  const exitTripRoute = () => {
+    tripRouteRequest.current += 1;
+    router.replace("/explore");
+  };
+
+  useEffect(() => {
+    if (!isTripRouteMode) {
+      setTripRoute(null);
+      setTripRouteInfo(null);
+      setTripRouteError(null);
+      return;
+    }
+
+    let active = true;
+    loadTripRoute().finally(() => {
+      if (!active) return;
+    });
+    return () => {
+      active = false;
+      tripRouteRequest.current += 1;
+    };
+  }, [isTripRouteMode, token, tripId]);
 
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
   const mapConfigurationMissing =
@@ -250,7 +333,7 @@ export default function Explore() {
     let isCancelled = false;
 
     const startTracking = async () => {
-      if (hasLocationPermission) {
+      if (hasLocationPermission && !isTripRouteMode) {
         const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Highest,
@@ -279,7 +362,7 @@ export default function Explore() {
         subscriber.remove();
       }
     };
-  }, [hasLocationPermission]);
+  }, [hasLocationPermission, isTripRouteMode]);
 
   const requestPermission = async () => {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
@@ -535,7 +618,7 @@ export default function Explore() {
     <>
       <ThemedView safe={true} style={styles.explore}>
         {/* Permission Request Bar - Floating at the absolute top */}
-        {hasLocationPermission === false && (
+        {!isTripRouteMode && hasLocationPermission === false && (
           <View
             style={[
               styles.requestBar,
@@ -568,7 +651,7 @@ export default function Explore() {
                 scale: 250000,
               }}
             >
-              {FEATURE_LAYERS.destination && (
+              {!isTripRouteMode && FEATURE_LAYERS.destination && (
                 <FeatureLayer
                   ref={destLayerRef}
                   visible={showLandmarks}
@@ -578,7 +661,7 @@ export default function Explore() {
                   labels={destinationLabelConfig}
                 />
               )}
-              {FEATURE_LAYERS.branches && (
+              {!isTripRouteMode && FEATURE_LAYERS.branches && (
                 <FeatureLayer
                   ref={branchesLayerRef}
                   visible={showBranches}
@@ -592,7 +675,7 @@ export default function Explore() {
                 ref={mapViewRef}
                 style={styles.map}
                 viewpoint={mapViewpoint}
-                onTap={handleMapTap}
+                onTap={isTripRouteMode ? undefined : handleMapTap}
                 onMapLoaded={() => {
                   setMapStatus("ready");
                   setMapError(null);
@@ -604,13 +687,14 @@ export default function Explore() {
                       "The map could not be loaded.",
                   );
                 }}
-                locationDisplay={
-                  hasLocationPermission
-                    ? { showLocation: true, autoPanMode: "off" }
-                    : undefined
-                }
-              >
-                {searchPoint && (
+                  locationDisplay={
+                    hasLocationPermission && !isTripRouteMode
+                      ? { showLocation: true, autoPanMode: "off" }
+                      : undefined
+                  }
+                >
+                  {isTripRouteMode && <TripRouteOverlay route={tripRoute} />}
+                {!isTripRouteMode && searchPoint && (
                   <GraphicsOverlay>
                     <Graphic
                       geometry={{
@@ -622,7 +706,7 @@ export default function Explore() {
                     />
                   </GraphicsOverlay>
                 )}
-                {highlightGraphic && (
+                {!isTripRouteMode && highlightGraphic && (
                   <GraphicsOverlay>
                     <Graphic
                       geometry={highlightGraphic.geometry}
@@ -633,7 +717,7 @@ export default function Explore() {
               </MapView>
             </Map>
           </MapSettings>
-          {selectedFeature && clickLocation && (
+          {!isTripRouteMode && selectedFeature && clickLocation && (
             <CustomPopup
               data={selectedFeature}
               location={clickLocation}
@@ -676,7 +760,7 @@ export default function Explore() {
               colorTheme={colorTheme}
             />
           )}
-          {mapStatus === "loading" && !mapConfigurationMissing && (
+          {!isTripRouteMode && mapStatus === "loading" && !mapConfigurationMissing && (
             <View
               style={[
                 styles.mapStatusCard,
@@ -706,7 +790,7 @@ export default function Explore() {
               </Text>
             </View>
           )}
-          {mapStatus !== "error" && mapConfigurationMissing && (
+          {!isTripRouteMode && mapStatus !== "error" && mapConfigurationMissing && (
             <View
               style={[
                 styles.mapStatusCard,
@@ -726,8 +810,20 @@ export default function Explore() {
           )}
         </View>
 
+        {isTripRouteMode && (
+          <TripRoutePanel
+            trip={tripRouteInfo}
+            route={tripRoute}
+            loading={tripRouteLoading}
+            error={tripRouteError}
+            colorTheme={colorTheme}
+            onRetry={loadTripRoute}
+            onExit={exitTripRoute}
+          />
+        )}
+
         {/* Floating Search Container - Cleanly positioned below the request bar */}
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+        {!isTripRouteMode && <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
           <View
             style={[
               styles.searchContainer,
@@ -890,9 +986,9 @@ export default function Explore() {
               </ScrollView>
             )}
           </View>
-        </TouchableWithoutFeedback>
+        </TouchableWithoutFeedback>}
         {/* My Location Button - Floating at the bottom right */}
-        <TouchableOpacity
+        {!isTripRouteMode && <TouchableOpacity
           style={[
             styles.myLocationButton,
             {
@@ -903,7 +999,21 @@ export default function Explore() {
           onPress={handleGoToMyLocation}
         >
           <Ionicons name="locate" size={18} color={colorTheme.title} />
-        </TouchableOpacity>
+        </TouchableOpacity>}
+        {isTripRouteMode && (
+          <TouchableOpacity
+            style={[
+              styles.routeBackButton,
+              { top: insets.top + 10, backgroundColor: colorTheme.uiBackground },
+            ]}
+            onPress={exitTripRoute}
+            accessibilityRole="button"
+            accessibilityLabel="Exit trip route"
+          >
+            <Ionicons name="arrow-back" size={20} color={colorTheme.title} />
+            <Text style={[styles.routeBackText, { color: colorTheme.text }]}>Trip Route</Text>
+          </TouchableOpacity>
+        )}
       </ThemedView>
     </>
   );
@@ -1059,5 +1169,25 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
+  },
+  routeBackButton: {
+    position: "absolute",
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    zIndex: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  routeBackText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 });
