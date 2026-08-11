@@ -137,6 +137,7 @@ export default function Explore() {
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+
   const { mode, tripId } = useLocalSearchParams();
   const { token } = useUser();
   const { isInDraft, toggleDraft, draftIds, draftCount } = useTripDraft();
@@ -687,13 +688,13 @@ export default function Explore() {
                       "The map could not be loaded.",
                   );
                 }}
-                  locationDisplay={
-                    hasLocationPermission && !isTripRouteMode
-                      ? { showLocation: true, autoPanMode: "off" }
-                      : undefined
-                  }
-                >
-                  {isTripRouteMode && <TripRouteOverlay route={tripRoute} />}
+                locationDisplay={
+                  hasLocationPermission && !isTripRouteMode
+                    ? { showLocation: true, autoPanMode: "off" }
+                    : undefined
+                }
+              >
+                {isTripRouteMode && <TripRouteOverlay route={tripRoute} />}
                 {!isTripRouteMode && searchPoint && (
                   <GraphicsOverlay>
                     <Graphic
@@ -760,19 +761,23 @@ export default function Explore() {
               colorTheme={colorTheme}
             />
           )}
-          {!isTripRouteMode && mapStatus === "loading" && !mapConfigurationMissing && (
-            <View
-              style={[
-                styles.mapStatusCard,
-                { backgroundColor: colorTheme.uiBackground },
-              ]}
-            >
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
-                Loading map...
-              </Text>
-            </View>
-          )}
+          {!isTripRouteMode &&
+            mapStatus === "loading" &&
+            !mapConfigurationMissing && (
+              <View
+                style={[
+                  styles.mapStatusCard,
+                  { backgroundColor: colorTheme.uiBackground },
+                ]}
+              >
+                <ActivityIndicator size="small" color={Colors.primary} />
+                <Text
+                  style={[styles.mapStatusText, { color: colorTheme.text }]}
+                >
+                  Loading map...
+                </Text>
+              </View>
+            )}
           {mapStatus === "error" && (
             <View
               style={[
@@ -790,24 +795,28 @@ export default function Explore() {
               </Text>
             </View>
           )}
-          {!isTripRouteMode && mapStatus !== "error" && mapConfigurationMissing && (
-            <View
-              style={[
-                styles.mapStatusCard,
-                { backgroundColor: colorTheme.uiBackground },
-              ]}
-            >
-              <Ionicons
-                name="information-circle-outline"
-                size={20}
-                color={Colors.primary}
-              />
-              <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
-                Map layers are not configured. Check your ArcGIS environment
-                settings.
-              </Text>
-            </View>
-          )}
+          {!isTripRouteMode &&
+            mapStatus !== "error" &&
+            mapConfigurationMissing && (
+              <View
+                style={[
+                  styles.mapStatusCard,
+                  { backgroundColor: colorTheme.uiBackground },
+                ]}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={20}
+                  color={Colors.primary}
+                />
+                <Text
+                  style={[styles.mapStatusText, { color: colorTheme.text }]}
+                >
+                  Map layers are not configured. Check your ArcGIS environment
+                  settings.
+                </Text>
+              </View>
+            )}
         </View>
 
         {isTripRouteMode && (
@@ -823,195 +832,204 @@ export default function Explore() {
         )}
 
         {/* Floating Search Container - Cleanly positioned below the request bar */}
-        {!isTripRouteMode && <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View
-            style={[
-              styles.searchContainer,
-              {
-                top:
-                  hasLocationPermission === false
-                    ? insets.top + 65
-                    : insets.top + 10,
-              },
-            ]}
-          >
-            <View style={styles.inputWrapper}>
-              <ThemedTextInput
-                placeholder="Search"
-                value={searchQuery}
-                onChangeText={(text) => {
-                  setSearchQuery(text);
-                  if (text.trim().length > 0) setShowSuggestions(true);
-                }}
-                onFocus={() => {
-                  if (searchQuery.trim().length > 0) setShowSuggestions(true);
-                }}
-                returnKeyType="search"
-                onSubmitEditing={() => handleSearch(searchQuery)}
-                style={[
-                  styles.inputStyle,
-                  { borderColor: colorTheme.border, borderWidth: 2 },
-                ]}
-                ref={searchRef}
-                placeholderTextColor={colorTheme.placeholder}
-              />
-              <View style={styles.iconContainer}>
-                {searchQuery.length > 0 && !isSearching && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSearchQuery("");
-                      clearMapSelection();
-                    }}
-                    style={styles.iconButton}
-                  >
-                    <Ionicons name="close-circle" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-                {isSearching ? (
-                  <View style={styles.iconButton}>
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => {
-                      handleSearch(searchQuery);
-                      searchRef.current.focus();
-                    }}
-                  >
-                    <Ionicons name="search" size={20} color="#64748B" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Suggestions Dropdown OR Filter Pills */}
-            {showSuggestions && suggestions.length > 0 ? (
-              <View
-                style={[
-                  styles.suggestionsDropdown,
-                  {
-                    backgroundColor: colorTheme.uiBackground,
-                    borderColor: colorTheme.border,
-                  },
-                ]}
-              >
-                {suggestions.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.suggestionItem,
-                      index < suggestions.length - 1 && {
-                        borderBottomColor: colorTheme.border,
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSearchQuery(item.name);
-                      setShowSuggestions(false);
-                      handleSearch(item.name, item.type);
-                    }}
-                  >
-                    <Ionicons
-                      name="location-outline"
-                      size={20}
-                      color={colorTheme.title}
-                      style={{ marginRight: 10 }}
-                    />
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 15,
-                        fontWeight: "500",
-                        color: colorTheme.text,
-                      }}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        opacity: 0.5,
-                        color: colorTheme.text,
-                      }}
-                    >
-                      {item.type === "landmark" ? "Landmark" : "Branch"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.filterContainer}
-                contentContainerStyle={styles.filterContent}
-              >
-                <TouchableOpacity
+        {!isTripRouteMode && (
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View
+              style={[
+                styles.searchContainer,
+                {
+                  top:
+                    hasLocationPermission === false
+                      ? insets.top + 65
+                      : insets.top + 10,
+                },
+              ]}
+            >
+              <View style={styles.inputWrapper}>
+                <ThemedTextInput
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChangeText={(text) => {
+                    setSearchQuery(text);
+                    if (text.trim().length > 0) setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (searchQuery.trim().length > 0) setShowSuggestions(true);
+                  }}
+                  returnKeyType="search"
+                  onSubmitEditing={() => handleSearch(searchQuery)}
                   style={[
-                    styles.filterPill,
-                    showLandmarks && styles.filterPillActive,
-                    showLandmarks && {
-                      backgroundColor: colorTheme.mapDestination,
+                    styles.inputStyle,
+                    { borderColor: colorTheme.border, borderWidth: 2 },
+                  ]}
+                  ref={searchRef}
+                  placeholderTextColor={colorTheme.placeholder}
+                />
+                <View style={styles.iconContainer}>
+                  {searchQuery.length > 0 && !isSearching && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSearchQuery("");
+                        clearMapSelection();
+                      }}
+                      style={styles.iconButton}
+                    >
+                      <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                  {isSearching ? (
+                    <View style={styles.iconButton}>
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.iconButton}
+                      onPress={() => {
+                        handleSearch(searchQuery);
+                        searchRef.current.focus();
+                      }}
+                    >
+                      <Ionicons name="search" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Suggestions Dropdown OR Filter Pills */}
+              {showSuggestions && suggestions.length > 0 ? (
+                <View
+                  style={[
+                    styles.suggestionsDropdown,
+                    {
+                      backgroundColor: colorTheme.uiBackground,
+                      borderColor: colorTheme.border,
                     },
                   ]}
-                  onPress={() => setShowLandmarks(!showLandmarks)}
                 >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      showLandmarks && { color: colorTheme.mapText },
-                    ]}
-                  >
-                    Landmarks
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.filterPill,
-                    showBranches && styles.filterPillActive,
-                    showBranches && { backgroundColor: colorTheme.mapBranch },
-                  ]}
-                  onPress={() => setShowBranches(!showBranches)}
+                  {suggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.suggestionItem,
+                        index < suggestions.length - 1 && {
+                          borderBottomColor: colorTheme.border,
+                          borderBottomWidth: StyleSheet.hairlineWidth,
+                        },
+                      ]}
+                      onPress={() => {
+                        setSearchQuery(item.name);
+                        setShowSuggestions(false);
+                        handleSearch(item.name, item.type);
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={20}
+                        color={colorTheme.title}
+                        style={{ marginRight: 10 }}
+                      />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 15,
+                          fontWeight: "500",
+                          color: colorTheme.text,
+                        }}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.5,
+                          color: colorTheme.text,
+                        }}
+                      >
+                        {item.type === "landmark" ? "Landmark" : "Branch"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filterContainer}
+                  contentContainerStyle={styles.filterContent}
                 >
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.filterText,
-                      showBranches && { color: colorTheme.mapText },
+                      styles.filterPill,
+                      showLandmarks && styles.filterPillActive,
+                      showLandmarks && {
+                        backgroundColor: colorTheme.mapDestination,
+                      },
                     ]}
+                    onPress={() => setShowLandmarks(!showLandmarks)}
                   >
-                    Branches
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-          </View>
-        </TouchableWithoutFeedback>}
+                    <Text
+                      style={[
+                        styles.filterText,
+                        showLandmarks && { color: colorTheme.mapText },
+                      ]}
+                    >
+                      Landmarks
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterPill,
+                      showBranches && styles.filterPillActive,
+                      showBranches && { backgroundColor: colorTheme.mapBranch },
+                    ]}
+                    onPress={() => setShowBranches(!showBranches)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        showBranches && { color: colorTheme.mapText },
+                      ]}
+                    >
+                      Branches
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
+          </TouchableWithoutFeedback>
+        )}
         {/* My Location Button - Floating at the bottom right */}
-        {!isTripRouteMode && <TouchableOpacity
-          style={[
-            styles.myLocationButton,
-            {
-              bottom: insets.bottom + 80,
-              backgroundColor: colorTheme.uiBackground,
-            },
-          ]}
-          onPress={handleGoToMyLocation}
-        >
-          <Ionicons name="locate" size={18} color={colorTheme.title} />
-        </TouchableOpacity>}
+        {!isTripRouteMode && (
+          <TouchableOpacity
+            style={[
+              styles.myLocationButton,
+              {
+                bottom: insets.bottom + 80,
+                backgroundColor: colorTheme.uiBackground,
+              },
+            ]}
+            onPress={handleGoToMyLocation}
+          >
+            <Ionicons name="locate" size={18} color={colorTheme.title} />
+          </TouchableOpacity>
+        )}
         {isTripRouteMode && (
           <TouchableOpacity
             style={[
               styles.routeBackButton,
-              { top: insets.top + 10, backgroundColor: colorTheme.uiBackground },
+              {
+                top: insets.top + 10,
+                backgroundColor: colorTheme.uiBackground,
+              },
             ]}
             onPress={exitTripRoute}
             accessibilityRole="button"
             accessibilityLabel="Exit trip route"
           >
             <Ionicons name="arrow-back" size={20} color={colorTheme.title} />
-            <Text style={[styles.routeBackText, { color: colorTheme.text }]}>Trip Route</Text>
+            <Text style={[styles.routeBackText, { color: colorTheme.text }]}>
+              Trip Route
+            </Text>
           </TouchableOpacity>
         )}
       </ThemedView>

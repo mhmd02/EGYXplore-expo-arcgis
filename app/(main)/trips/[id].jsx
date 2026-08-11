@@ -10,7 +10,7 @@ import {
   Linking,
   useWindowDimensions,
 } from "react-native";
-import { useLocalSearchParams } from "expo-router";
+import { Stack, useLocalSearchParams, useRouter } from "expo-router";
 import { useContext, useEffect, useState } from "react";
 import { Ionicons } from "@expo/vector-icons";
 
@@ -35,6 +35,15 @@ export default function TripDetail() {
   const { isInDraft, toggleDraft, draftCount } = useTripDraft();
   const { id } = useLocalSearchParams();
   const destinationId = Array.isArray(id) ? id[0] : id;
+  const router = useRouter();
+
+  const handleBack = () => {
+    if (router.canDismiss()) {
+      router.dismissAll();
+    } else {
+      router.replace("/trips");
+    }
+  };
   const { width: windowWidth } = useWindowDimensions();
   const galleryWidth = Math.max(windowWidth - 32, 1);
 
@@ -178,7 +187,21 @@ export default function TripDetail() {
   }
 
   return (
-    <ThemedView safe={true} style={[styles.container, { paddingTop: 0 }]}>
+    <>
+      <Stack.Screen
+        options={{
+          headerLeft: () => (
+            <TouchableOpacity onPress={handleBack}>
+              <Ionicons
+                name="arrow-back"
+                size={24}
+                color={colorTheme.title}
+              />
+            </TouchableOpacity>
+          ),
+        }}
+      />
+      <ThemedView safe={true} style={[styles.container, { paddingTop: 0 }]}>
       <ScrollView
         style={[
           styles.container,
@@ -364,6 +387,7 @@ export default function TripDetail() {
         </View>
       </ScrollView>
     </ThemedView>
+    </>
   );
 }
 
