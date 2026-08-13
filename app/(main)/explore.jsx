@@ -653,7 +653,7 @@ export default function Explore() {
                 }
 
                 clearMapSelection();
-                router.push(`/trips/${destinationId}`);
+                router.navigate(`/trips/${destinationId}`);
               }}
               onToggleDraft={(featureData) => {
                 const destinationId = Number(featureData?.Id);
