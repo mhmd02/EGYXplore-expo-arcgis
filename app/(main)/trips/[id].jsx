@@ -115,8 +115,7 @@ export default function TripDetail() {
     ),
   ];
   const rawBookingUrl = destinationDetails.bookingUrl?.trim();
-  const hasBookingUrl =
-    rawBookingUrl && !/^(null|n\/a)$/i.test(rawBookingUrl);
+  const hasBookingUrl = rawBookingUrl && !/^(null|n\/a)$/i.test(rawBookingUrl);
   const bookingUrl = hasBookingUrl
     ? /^https?:\/\//i.test(rawBookingUrl)
       ? rawBookingUrl
@@ -273,7 +272,9 @@ export default function TripDetail() {
             accessibilityLabel={`${destinationIsInDraft ? "Remove" : "Add"} ${destinationDetails.name} ${destinationIsInDraft ? "from" : "to"} itinerary`}
           >
             <Ionicons
-              name={destinationIsInDraft ? "checkmark-circle" : "add-circle-outline"}
+              name={
+                destinationIsInDraft ? "checkmark-circle" : "add-circle-outline"
+              }
               size={20}
               color={destinationIsInDraft ? Colors.success : Colors.primary}
             />
@@ -311,7 +312,11 @@ export default function TripDetail() {
                 accessibilityRole="link"
                 accessibilityLabel={`Book tickets for ${destinationDetails.name}`}
               >
-                <Ionicons name="ticket-outline" size={16} color="#D4AF37" />
+                <Ionicons
+                  name="open-outline"
+                  size={16}
+                  color="#D4AF37"
+                />
                 <ThemedText title={true} style={styles.booking}>
                   Booking Link
                 </ThemedText>
@@ -329,9 +334,7 @@ export default function TripDetail() {
               color="#D4AF37"
               style={styles.cardIcon}
             />
-            <ThemedText style={styles.cardValue}>
-              {openingHours}
-            </ThemedText>
+            <ThemedText style={styles.cardValue}>{openingHours}</ThemedText>
             <ThemedText style={styles.cardLabel}>Opening Hours</ThemedText>
           </ThemedCard>
 

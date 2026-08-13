@@ -42,12 +42,6 @@ export default function CustomPopup({
           ? `${rawPrice} EGP`
           : "Price unavailable";
     const addedToDraft = isInDraft?.(data) ?? false;
-    const destinationsImages =
-      typeof data.Images === "string"
-        ? data.Images.split("|")
-            .map((image) => image.trim())
-            .filter(Boolean)
-        : [];
     return (
       <View style={styles.overlay}>
         <ScrollView
@@ -133,35 +127,6 @@ export default function CustomPopup({
                 </Text>
               </TouchableOpacity>
             )}
-            <View style={styles.swipeIndicator}>
-              <Text style={styles.swipeText}>Swipe</Text>
-              <Ionicons name="chevron-forward" size={16} color="#94A3B8" />
-            </View>
-          </View>
-          <View style={[styles.popupContainer, { width: screenWidth - 40 }]}>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close-circle" color="#94A3B8" size={28} />
-            </TouchableOpacity>
-
-            <Text style={[styles.title, { marginBottom: 16 }]}>Gallery</Text>
-            <View style={styles.divider} />
-            <ScrollView
-              horizontal
-              nestedScrollEnabled={true}
-              showsHorizontalScrollIndicator={false}
-              contentContainerStyle={{ gap: 10 }}
-            >
-              {destinationsImages &&
-                destinationsImages.map((destinationImage, index) => {
-                  return (
-                    <Image
-                      source={{ uri: destinationImage }}
-                      key={index}
-                      style={{ width: 200, height: 150, borderRadius: 12 }}
-                    />
-                  );
-                })}
-            </ScrollView>
           </View>
         </ScrollView>
       </View>
