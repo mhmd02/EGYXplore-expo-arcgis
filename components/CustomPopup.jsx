@@ -5,8 +5,6 @@ import {
   Text,
   TouchableOpacity,
   StyleSheet,
-  ScrollView,
-  Image,
   Dimensions,
 } from "react-native";
 import { LAYER_FIELDS } from "../config/arcgis";
@@ -17,6 +15,7 @@ export default function CustomPopup({
   layerInfo,
   onClose,
   onNavigate,
+  onPressNavigate,
   onToggleDraft,
   isInDraft,
   draftStopNumber,
@@ -36,99 +35,108 @@ export default function CustomPopup({
     const rating = data.Rating;
     const rawPrice = data.ForeignPrice ?? data.TicketPrice;
     const ticketPrice =
-      rawPrice === 0
-        ? "Free Entry"
-        : rawPrice != null
-          ? `${rawPrice} EGP`
-          : "Price unavailable";
+      rawPrice === 0 ? "Free" : rawPrice != null ? `${rawPrice} EGP` : "N/A";
     const addedToDraft = isInDraft?.(data) ?? false;
+
     return (
       <View style={styles.overlay}>
-        <ScrollView
-          horizontal
-          pagingEnabled
-          showsHorizontalScrollIndicator={false}
-          style={{ width: screenWidth }}
-          contentContainerStyle={{ alignItems: "flex-end" }}
-        >
-          <View style={[styles.popupContainer, { width: screenWidth - 40 }]}>
-            <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-              <Ionicons name="close-circle" color="#94A3B8" size={28} />
-            </TouchableOpacity>
+        <View style={[styles.popupContainer, { width: screenWidth - 40 }]}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close" color={colorTheme.text} size={20} />
+          </TouchableOpacity>
 
-            <View style={styles.header}>
-              <Text style={styles.title}>{name}</Text>
-              {rating ? (
-                <View style={styles.ratingBadge}>
-                  <Ionicons name="star" color="#F59E0B" size={14} />
-                  <Text style={styles.ratingText}>{rating}</Text>
-                </View>
-              ) : null}
+          <View style={styles.header}>
+            <Text style={styles.title} numberOfLines={1}>
+              {name}
+            </Text>
+          </View>
+
+          <View style={styles.divider} />
+
+          <View style={styles.infoList}>
+            <View style={styles.infoRow}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="location-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+              </View>
+              <Text style={styles.infoText}>{city}</Text>
             </View>
 
-            <View style={styles.divider} />
-
-            <View style={styles.infoList}>
-              <View style={styles.infoRow}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="location-outline" size={18} color="#3B82F6" />
-                </View>
-                <Text style={styles.infoText}>{city}</Text>
+            <View style={styles.infoRow}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="pricetag-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
               </View>
-
-              <View style={styles.infoRow}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="pricetag-outline" size={18} color="#8B5CF6" />
-                </View>
-                <Text style={styles.infoText}>{category}</Text>
-              </View>
-
-              <View style={styles.infoRow}>
-                <View style={styles.iconBox}>
-                  <Ionicons name="ticket-outline" size={18} color="#10B981" />
-                </View>
-                <Text style={styles.infoText}>{ticketPrice}</Text>
-              </View>
+              <Text style={styles.infoText}>{category}</Text>
             </View>
+
+            <View style={styles.infoRow}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="ticket-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+              </View>
+              <Text style={styles.infoText}>{ticketPrice}</Text>
+            </View>
+          </View>
+
+          <View style={styles.actionRow}>
             {onNavigate && (
               <TouchableOpacity
-                style={styles.detailsButton}
+                style={styles.actionBtn}
                 onPress={() => onNavigate(data)}
-                activeOpacity={0.8}
-                accessibilityRole="link"
-                accessibilityLabel={`View details for ${name}`}
-              >
-                <Text style={styles.detailsButtonText}>View Details</Text>
-                <Ionicons name="arrow-forward" size={16} color="#fff" />
-              </TouchableOpacity>
-            )}
-            {onToggleDraft && (
-              <TouchableOpacity
-                style={[
-                  styles.itineraryButton,
-                  addedToDraft && styles.itineraryButtonAdded,
-                ]}
-                onPress={() => onToggleDraft(data)}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-                accessibilityLabel={`${addedToDraft ? "Remove" : "Add"} ${name} ${addedToDraft ? "from" : "to"} itinerary`}
               >
                 <Ionicons
-                  name={
-                    addedToDraft ? "checkmark-circle" : "add-circle-outline"
-                  }
-                  size={18}
-                  color={addedToDraft ? "#10B981" : "#3B82F6"}
+                  name="information-circle-outline"
+                  size={15}
+                  color={colorTheme.text}
                 />
-                <Text style={styles.itineraryButtonText}>
-                  {addedToDraft
-                    ? `Stop #${draftStopNumber} — Remove`
-                    : "Add to Itinerary"}
+                <Text style={styles.actionText}>Details</Text>
+              </TouchableOpacity>
+            )}
+
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => onPressNavigate?.(data)}
+            >
+              <Ionicons
+                name="navigate-outline"
+                size={15}
+                color={colorTheme.text}
+              />
+              <Text style={styles.actionText}>Navigate</Text>
+            </TouchableOpacity>
+
+            {onToggleDraft && (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => onToggleDraft(data)}
+              >
+                <Ionicons
+                  name={addedToDraft ? "checkmark" : "add"}
+                  size={16}
+                  color={addedToDraft ? "#10B981" : colorTheme.text}
+                />
+                <Text
+                  style={[
+                    styles.actionText,
+                    addedToDraft && { color: "#10B981" },
+                  ]}
+                >
+                  {addedToDraft ? `Stop #${draftStopNumber}` : "Add"}
                 </Text>
               </TouchableOpacity>
             )}
           </View>
-        </ScrollView>
+        </View>
       </View>
     );
   }
@@ -142,7 +150,7 @@ export default function CustomPopup({
       <View style={styles.branchesOverlay}>
         <View style={styles.branchesPopupContainer}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close-circle" color="#94A3B8" size={28} />
+            <Ionicons name="close" color={colorTheme.text} size={20} />
           </TouchableOpacity>
 
           <View style={styles.header}>
@@ -154,17 +162,39 @@ export default function CustomPopup({
           <View style={styles.infoList}>
             <View style={styles.infoRow}>
               <View style={styles.iconBox}>
-                <Ionicons name="map-outline" size={18} color="#F97316" />
+                <Ionicons
+                  name="map-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
               </View>
               <Text style={styles.infoText}>{address}</Text>
             </View>
 
             <View style={styles.infoRow}>
               <View style={styles.iconBox}>
-                <Ionicons name="call-outline" size={18} color="#14B8A6" />
+                <Ionicons
+                  name="call-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
               </View>
               <Text style={styles.infoText}>{phone}</Text>
             </View>
+          </View>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => onPressNavigate?.(data)}
+            >
+              <Ionicons
+                name="navigate-outline"
+                size={15}
+                color={colorTheme.text}
+              />
+              <Text style={styles.actionText}>Navigate</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
@@ -176,14 +206,30 @@ export default function CustomPopup({
       <View style={styles.branchesOverlay}>
         <View style={styles.branchesPopupContainer}>
           <TouchableOpacity style={styles.closeButton} onPress={onClose}>
-            <Ionicons name="close-circle" color="#94A3B8" size={28} />
+            <Ionicons name="close" color={colorTheme.text} size={20} />
           </TouchableOpacity>
+
           <Text style={styles.title}>{data.Name || "Selected place"}</Text>
           <View style={styles.divider} />
-          <Text style={styles.infoText}>
+
+          <Text style={[styles.infoText, { marginBottom: 12 }]}>
             This is a searched place. Select a destination or branch marker for
             tourism details.
           </Text>
+
+          <View style={styles.actionRow}>
+            <TouchableOpacity
+              style={styles.actionBtn}
+              onPress={() => onPressNavigate?.(data)}
+            >
+              <Ionicons
+                name="navigate-outline"
+                size={15}
+                color={colorTheme.text}
+              />
+              <Text style={styles.actionText}>Navigate</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
     );
@@ -196,78 +242,68 @@ const createStyles = (colorTheme) =>
   StyleSheet.create({
     overlay: {
       position: "absolute",
-      bottom: 70,
+      bottom: 40,
       justifyContent: "flex-end",
     },
     popupContainer: {
       backgroundColor: colorTheme.background,
-      borderRadius: 24,
-      padding: 24,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.15,
-      shadowRadius: 20,
-      elevation: 10,
-      marginBottom: 30,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "rgba(150,150,150,0.15)",
+      padding: 16,
+      marginBottom: 40,
       marginHorizontal: 20,
       right: 10,
+      elevation: 0,
+      shadowOpacity: 0,
     },
     branchesOverlay: {
       position: "absolute",
-      bottom: 50,
+      bottom: 40,
       left: 10,
       right: 0,
-      padding: 20,
+      padding: 10,
       justifyContent: "flex-end",
     },
     branchesPopupContainer: {
-      position: "relative",
       backgroundColor: colorTheme.background,
-      borderRadius: 24,
-      padding: 24,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 10 },
-      shadowOpacity: 0.15,
-      shadowRadius: 20,
-      elevation: 10,
-      marginBottom: 30,
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "rgba(150,150,150,0.15)",
+      padding: 16,
+      marginBottom: 40,
       marginHorizontal: 20,
-      left: 10,
-      // bottom: 1,
+      elevation: 0,
+      shadowOpacity: 0,
     },
     header: {
       flexDirection: "row",
       justifyContent: "space-between",
-      alignItems: "flex-start",
-      marginBottom: 16,
-      paddingRight: 32, // make room for close button
+      alignItems: "center",
+      marginBottom: 10,
+      paddingRight: 24,
     },
     title: {
       color: colorTheme.title,
-      fontSize: 22,
-      fontWeight: "800",
+      fontSize: 16,
+      fontWeight: "500",
       flex: 1,
-      marginRight: 12,
+      marginRight: 8,
     },
     ratingBadge: {
       flexDirection: "row",
       alignItems: "center",
-      backgroundColor: "#FEF3C7",
-      paddingHorizontal: 8,
-      paddingVertical: 4,
-      borderRadius: 12,
-      marginTop: 2,
+      gap: 2,
     },
     ratingText: {
-      color: "#B45309",
-      fontWeight: "bold",
-      fontSize: 14,
-      marginLeft: 4,
+      color: colorTheme.text,
+      fontWeight: "500",
+      fontSize: 13,
     },
     divider: {
       height: 1,
-      backgroundColor: "rgba(150,150,150,0.2)",
-      marginBottom: 16,
+      backgroundColor: "rgba(150,150,150,0.1)",
+      marginBottom: 12,
     },
     infoList: {
       flexDirection: "column",
@@ -275,78 +311,43 @@ const createStyles = (colorTheme) =>
     infoRow: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 12,
+      marginBottom: 8,
     },
     iconBox: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: "rgba(150,150,150,0.1)",
+      width: 20,
       justifyContent: "center",
       alignItems: "center",
-      marginRight: 14,
+      marginRight: 8,
     },
     infoText: {
       color: colorTheme.text,
-      fontSize: 15,
-      fontWeight: "500",
+      fontSize: 13,
+      fontWeight: "400",
       flex: 1,
     },
     closeButton: {
       position: "absolute",
-      top: 16,
-      right: 16,
+      top: 14,
+      right: 14,
       zIndex: 10,
     },
-    swipeIndicator: {
-      position: "absolute",
-      right: 25,
-      bottom: 7,
+    actionRow: {
       flexDirection: "row",
       alignItems: "center",
-      opacity: 0.6,
+      marginTop: 8,
+      paddingTop: 12,
+      borderTopWidth: 1,
+      borderTopColor: "rgba(150,150,150,0.1)",
+      gap: 16,
     },
-    swipeText: {
-      fontSize: 12,
-      color: "#94A3B8",
-      marginRight: 2,
-      fontWeight: "600",
-    },
-    detailsButton: {
+    actionBtn: {
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      backgroundColor: "#3B82F6",
-      paddingVertical: 12,
-      paddingHorizontal: 20,
-      borderRadius: 14,
-      marginTop: 16,
-      gap: 8,
+      gap: 4,
     },
-    detailsButtonText: {
-      color: "#fff",
-      fontSize: 15,
-      fontWeight: "700",
-    },
-    itineraryButton: {
-      flexDirection: "row",
-      alignItems: "center",
-      justifyContent: "center",
-      gap: 7,
-      paddingVertical: 11,
-      paddingHorizontal: 16,
-      borderRadius: 14,
-      marginTop: 10,
-      borderWidth: 1,
-      borderColor: "#3B82F6",
-    },
-    itineraryButtonAdded: {
-      borderColor: "#10B981",
-      backgroundColor: "rgba(16, 185, 129, 0.1)",
-    },
-    itineraryButtonText: {
+    actionText: {
       color: colorTheme.text,
-      fontSize: 14,
-      fontWeight: "700",
+      fontSize: 13,
+      fontWeight: "500",
     },
   });
