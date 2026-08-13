@@ -22,6 +22,7 @@ import {
   Graphic,
   geocoder,
   geometryEngine,
+  router as routing,
 } from "expo-arcgis";
 import { Ionicons } from "@expo/vector-icons";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -122,7 +123,8 @@ export default function Explore() {
   // Filter states
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [showBranches, setShowBranches] = useState(true);
-
+  const [searchRoute, setSearchRoute] = useState(null);
+  const [status, setStatus] = useState(null);
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
@@ -308,12 +310,54 @@ export default function Explore() {
     }
   };
 
+  const handleRouting = async (destinationPoint) => {
+    if (!currentLocation?.coords || !destinationPoint) {
+      setSearchRoute(null);
+      return;
+    }
+    try {
+      const stops = [
+        {
+          point: {
+            type: "point",
+            x: currentLocation.coords.longitude,
+            y: currentLocation.coords.latitude,
+          },
+          name: "My Location",
+        },
+        {
+          point: {
+            type: "point",
+            x: destinationPoint.longitude,
+            y: destinationPoint.latitude,
+          },
+          name: "Destination",
+        },
+      ];
+      const { routes } = await routing.solveRoute(stops);
+      const route = routes[0];
+      if (route?.geometry) {
+        setSearchRoute(route.geometry);
+        setStatus(
+          `${(route.totalLength / 1000).toFixed(1)} km · ${Math.round(route.travelTime)} min`,
+        );
+      } else {
+        setSearchRoute(null);
+        setStatus("No route found");
+      }
+    } catch (e) {
+      console.warn("Routing error:", e);
+      setSearchRoute(null);
+    }
+  };
+
   const clearMapSelection = () => {
     setSelectedFeature(null);
     setClickLocation(null);
     setSearchPoint(null);
     setLayerInfo(null);
     setHighlightGraphic(null);
+    setSearchRoute(null);
   };
 
   const handleSearch = async (overrideQuery = null, preferredType = null) => {
@@ -367,6 +411,7 @@ export default function Explore() {
               setSelectedFeature(feature.attributes);
               setLayerInfo("destination");
               setShowLandmarks(true); // Automatically unhide the layer if it was off!
+              handleRouting({ latitude: lat, longitude: lon });
               return;
             }
           }
@@ -410,6 +455,7 @@ export default function Explore() {
               setSelectedFeature(feature.attributes);
               setLayerInfo("branches");
               setShowBranches(true); // Automatically unhide the layer if it was off!
+              handleRouting({ latitude: lat, longitude: lon });
               return;
             }
           }
@@ -444,6 +490,7 @@ export default function Explore() {
           });
           // 2. Drop a marker on the map at the searched place
           setSearchPoint({ latitude: lat, longitude: lon });
+          handleRouting({ latitude: lat, longitude: lon });
         }
         // 3. Open the popup at that location
         setClickLocation({ latitude: lat, longitude: lon });
@@ -508,7 +555,7 @@ export default function Explore() {
         setMapViewpoint({
           // Offset south so the tapped feature isn't hidden behind the popup,
           // which docks near the bottom of the screen.
-          latitude: mapPoint.latitude - 0.005,
+          latitude: mapPoint.latitude,
           longitude: mapPoint.longitude,
           scale: 15000,
         });
@@ -630,6 +677,18 @@ export default function Explore() {
                     />
                   </GraphicsOverlay>
                 )}
+                {searchRoute && (
+                  <GraphicsOverlay>
+                    <Graphic
+                      geometry={searchRoute}
+                      symbol={{
+                        type: "simple-line",
+                        color: "lightblue",
+                        width: 4,
+                      }}
+                    ></Graphic>
+                  </GraphicsOverlay>
+                )}
               </MapView>
             </Map>
           </MapSettings>
@@ -674,6 +733,9 @@ export default function Explore() {
               }
               draftCount={draftCount}
               colorTheme={colorTheme}
+              onPressNavigate={(featureData) => {
+                if (clickLocation) handleRouting(clickLocation);
+              }}
             />
           )}
           {mapStatus === "loading" && !mapConfigurationMissing && (
