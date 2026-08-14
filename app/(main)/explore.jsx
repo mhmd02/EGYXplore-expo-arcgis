@@ -13,6 +13,7 @@ import {
   ActivityIndicator,
   ScrollView,
 } from "react-native";
+import { useLocalSearchParams } from "expo-router";
 import {
   MapSettings,
   Map,
@@ -35,19 +36,26 @@ import CustomPopup from "../../components/CustomPopup.jsx";
 import { ThemeContext } from "../../context/ThemeContext";
 import { useTripDraft } from "../../context/TripDraftContext";
 import { Colors } from "../../constants/Colors";
+import { getTripById } from "../../api/tripApi.js";
+import {
+  normalizeTripStops,
+  solveTripRoute,
+  TripRouteError,
+} from "../../services/tripRouteService.js";
+import TripRouteOverlay from "../../components/TripRouteOverlay.jsx";
+import TripRoutePanel from "../../components/TripRoutePanel.jsx";
 import {
   ARCGIS_API_KEY,
   ARCGIS_LICENSE_KEY,
+  ARCGIS_ROUTE_SERVICE_URL,
   FEATURE_LAYERS,
   MAP_CENTER,
   DESTINATIONS_PORTAL_ID,
   LAYER_FIELDS,
 } from "../../config/arcgis.js";
+import { fa } from "zod/locales";
+import { useUser } from "../../context/UserContext.jsx";
 
-// Dynamic renderers are generated inside the component based on ThemeContext.
-// Marker dropped on the map for a geocoded search result (a one-off graphic,
-// not part of a data layer). A red diamond keeps it distinct from the blue
-// station markers and green metro lines.
 const searchMarkerSymbol = {
   type: "simple-marker",
   style: "circle",
@@ -56,8 +64,6 @@ const searchMarkerSymbol = {
   outline: { width: 1, color: "white" },
 };
 
-// The native `identify` returns the layer's title (layerName), while CustomPopup
-// keys off the old WebView layer ids. Map between them.
 const layerNameToId = (layerName = "") => {
   const name = layerName.toLowerCase();
   if (name.includes("destination")) return "destination";
@@ -80,7 +86,6 @@ const highlightLineSymbol = {
 
 const sanitizeSearchTerm = (input) => {
   if (!input) return "";
-  // Only escape single quotes for SQL. Do not strip other characters!
   return input.replace(/'/g, "''");
 };
 
@@ -119,25 +124,30 @@ export default function Explore() {
   const [mapViewpoint, setMapViewpoint] = useState(null);
   const [mapStatus, setMapStatus] = useState("loading");
   const [mapError, setMapError] = useState(null);
-
-  // Filter states
+  const [routeLoading, setRouteLoading] = useState(false);
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [showBranches, setShowBranches] = useState(true);
   const [searchRoute, setSearchRoute] = useState(null);
-  const [status, setStatus] = useState(null);
+  const [statusRoute, setStatusRoute] = useState(null);
   const { theme, setTheme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
+  const { mode, tripId } = useLocalSearchParams();
+  const { token } = useUser();
   const { isInDraft, toggleDraft, draftIds, draftCount } = useTripDraft();
-
+  const isTripRouteMode = mode === "saved-trip" && Boolean(tripId);
+  const tripRouteRequest = useRef(0);
+  const [tripRoute, setTripRoute] = useState(null);
+  const [tripRouteInfo, setTripRouteInfo] = useState(null);
+  const [tripRouteLoading, setTripRouteLoading] = useState(false);
+  const [tripRouteError, setTripRouteError] = useState(null);
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
   const mapConfigurationMissing =
     !ARCGIS_API_KEY ||
     !ARCGIS_LICENSE_KEY ||
     (!FEATURE_LAYERS.destination && !FEATURE_LAYERS.branches);
 
-  // Dynamic renderers connected to ThemeContext, wrapped in useMemo for optimal performance
   const destinationRenderer = useMemo(
     () => ({
       type: "simple",
@@ -182,6 +192,71 @@ export default function Explore() {
     setHasLocationPermission(currentStatus);
   };
 
+  const loadTripRoute = async () => {
+    const requestId = ++tripRouteRequest.current;
+    const numericTripId = Number(tripId);
+    if (!token || !Number.isInteger(numericTripId) || numericTripId <= 0) {
+      setTripRouteError("This trip could not be loaded.");
+      return;
+    }
+
+    setTripRouteLoading(true);
+    setTripRouteError(null);
+    try {
+      const trip = await getTripById(token, numericTripId);
+      const stops = normalizeTripStops([currentLocation, ...trip.stops]);
+      const route = await solveTripRoute(stops, {
+        routeServiceUrl: ARCGIS_ROUTE_SERVICE_URL,
+      });
+      if (requestId !== tripRouteRequest.current) return;
+      setTripRouteInfo(trip);
+      setTripRoute(route);
+      const latitudes = stops.map((stop) => stop.latitude);
+      const longitudes = stops.map((stop) => stop.longitude);
+      const latitudeSpan = Math.max(...latitudes) - Math.min(...latitudes);
+      const longitudeSpan = Math.max(...longitudes) - Math.min(...longitudes);
+      const largestSpan = Math.max(latitudeSpan, longitudeSpan);
+      setMapViewpoint({
+        latitude: (Math.min(...latitudes) + Math.max(...latitudes)) / 2,
+        longitude: (Math.min(...longitudes) + Math.max(...longitudes)) / 2,
+        scale: Math.max(25000, Math.min(2500000, largestSpan * 3000000)),
+      });
+    } catch (error) {
+      if (requestId !== tripRouteRequest.current) return;
+      setTripRoute(null);
+      setTripRouteError(
+        error instanceof TripRouteError
+          ? error.message
+          : "Unable to calculate this trip route.",
+      );
+    } finally {
+      if (requestId === tripRouteRequest.current) setTripRouteLoading(false);
+    }
+  };
+
+  const exitTripRoute = () => {
+    tripRouteRequest.current += 1;
+    router.replace("/explore");
+  };
+
+  useEffect(() => {
+    if (!isTripRouteMode) {
+      setTripRoute(null);
+      setTripRouteInfo(null);
+      setTripRouteError(null);
+      return;
+    }
+
+    let active = true;
+    loadTripRoute().finally(() => {
+      if (!active) return;
+    });
+    return () => {
+      active = false;
+      tripRouteRequest.current += 1;
+    };
+  }, [isTripRouteMode, token, tripId]);
+
   useEffect(() => {
     checkLocationStatus();
 
@@ -195,9 +270,14 @@ export default function Explore() {
     };
   }, []);
 
-  // Fetch search suggestions as the user types
+  const isSearchingRef = useRef(false);
+  useEffect(() => {
+    isSearchingRef.current = isSearching;
+  }, [isSearching]);
+
   useEffect(() => {
     const delayDebounceFn = setTimeout(async () => {
+      if (isSearchingRef.current) return;
       if (searchQuery.trim().length > 1 && showSuggestions) {
         const term = sanitizeSearchTerm(searchQuery.trim().toLowerCase());
         let localSuggestions = [];
@@ -228,7 +308,17 @@ export default function Explore() {
                 })),
               );
           }
-
+          if (localSuggestions.length === 0) {
+            const globalResults = await geocoder.suggest(searchQuery.trim());
+            if (globalResults && globalResults.length > 0) {
+              localSuggestions.push(
+                ...globalResults.map((item) => ({
+                  name: item.label,
+                  type: "geocoder",
+                })),
+              );
+            }
+          }
           // Remove duplicates based on name
           const unique = Array.from(
             new Set(localSuggestions.map((a) => a.name)),
@@ -245,14 +335,14 @@ export default function Explore() {
     }, 300); // 300ms debounce to prevent spamming the database
 
     return () => clearTimeout(delayDebounceFn);
-  }, [searchQuery, showSuggestions]);
+  }, [searchQuery]);
 
   useEffect(() => {
     let subscriber = null;
     let isCancelled = false;
 
     const startTracking = async () => {
-      if (hasLocationPermission) {
+      if (hasLocationPermission && !isTripRouteMode) {
         const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Highest,
@@ -281,7 +371,7 @@ export default function Explore() {
         subscriber.remove();
       }
     };
-  }, [hasLocationPermission]);
+  }, [hasLocationPermission, isTripRouteMode]);
 
   const requestPermission = async () => {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
@@ -313,8 +403,11 @@ export default function Explore() {
   const handleRouting = async (destinationPoint) => {
     if (!currentLocation?.coords || !destinationPoint) {
       setSearchRoute(null);
+      setStatusRoute(null);
       return;
     }
+    setRouteLoading(true);
+    setStatusRoute(null);
     try {
       const stops = [
         {
@@ -338,16 +431,19 @@ export default function Explore() {
       const route = routes[0];
       if (route?.geometry) {
         setSearchRoute(route.geometry);
-        setStatus(
+        setStatusRoute(
           `${(route.totalLength / 1000).toFixed(1)} km · ${Math.round(route.travelTime)} min`,
         );
       } else {
         setSearchRoute(null);
-        setStatus("No route found");
+        setStatusRoute("No route found");
       }
     } catch (e) {
       console.warn("Routing error:", e);
       setSearchRoute(null);
+      setStatusRoute("Couldn't calculate a route");
+    } finally {
+      setRouteLoading(false);
     }
   };
 
@@ -358,6 +454,8 @@ export default function Explore() {
     setLayerInfo(null);
     setHighlightGraphic(null);
     setSearchRoute(null);
+    setStatusRoute(null);
+    setRouteLoading(false);
   };
 
   const handleSearch = async (overrideQuery = null, preferredType = null) => {
@@ -375,7 +473,11 @@ export default function Explore() {
       const destWhere = `LOWER(${LAYER_FIELDS.destination}) LIKE '%${term}%'`;
       const branchWhere = `LOWER(${LAYER_FIELDS.branches}) LIKE '%${term}%'`;
       // 1. Search local Destinations first
-      if (destLayerRef.current && preferredType !== "branch") {
+      if (
+        destLayerRef.current &&
+        preferredType !== "branch" &&
+        preferredType !== "geocoder"
+      ) {
         const destResults = await destLayerRef.current.queryFeatures({
           whereClause: destWhere,
         });
@@ -411,7 +513,6 @@ export default function Explore() {
               setSelectedFeature(feature.attributes);
               setLayerInfo("destination");
               setShowLandmarks(true); // Automatically unhide the layer if it was off!
-              handleRouting({ latitude: lat, longitude: lon });
               return;
             }
           }
@@ -419,7 +520,11 @@ export default function Explore() {
       }
 
       // 2. Search local Branches next
-      if (branchesLayerRef.current && preferredType !== "landmark") {
+      if (
+        branchesLayerRef.current &&
+        preferredType !== "landmark" &&
+        preferredType !== "geocoder"
+      ) {
         const branchResults = await branchesLayerRef.current.queryFeatures({
           whereClause: branchWhere,
         });
@@ -455,7 +560,6 @@ export default function Explore() {
               setSelectedFeature(feature.attributes);
               setLayerInfo("branches");
               setShowBranches(true); // Automatically unhide the layer if it was off!
-              handleRouting({ latitude: lat, longitude: lon });
               return;
             }
           }
@@ -464,7 +568,9 @@ export default function Explore() {
 
       // 3. Fallback to Global ArcGIS Geocoder
       // This sends "Cairo", for example, to the ArcGIS servers
-      const results = await geocoder.geocode(queryToUse);
+      const results = await geocoder.geocode(queryToUse, {
+        resultAttributeNames: ["*"],
+      });
       if (!results || results.length === 0) {
         Alert.alert(
           "No Results",
@@ -473,8 +579,8 @@ export default function Explore() {
         setIsSearching(false);
         return;
       }
-      const bestMatch = results[0];
 
+      const bestMatch = results[0];
       const pt = bestMatch.location;
       if (pt) {
         clearMapSelection();
@@ -490,11 +596,14 @@ export default function Explore() {
           });
           // 2. Drop a marker on the map at the searched place
           setSearchPoint({ latitude: lat, longitude: lon });
-          handleRouting({ latitude: lat, longitude: lon });
         }
         // 3. Open the popup at that location
         setClickLocation({ latitude: lat, longitude: lon });
-        setSelectedFeature({ Name: bestMatch.label }); // Shows the place name in the popup
+        const attrs = bestMatch.attributes || {};
+        setSelectedFeature({
+          Name: bestMatch.label,
+          Description: attrs.LongLabel || "",
+        });
         setLayerInfo("geocoder");
       }
     } catch (err) {
@@ -526,7 +635,6 @@ export default function Explore() {
       );
     }
   };
-  // Native replacement for the WebView click/hitTest + postMessage flow.
   const handleMapTap = async (event) => {
     // Any tap dismisses the keyboard (was the "map-tapped" message).
     Keyboard.dismiss();
@@ -546,6 +654,10 @@ export default function Explore() {
       );
 
       if (hit) {
+        setSearchRoute(null);
+        setStatusRoute(null);
+        setRouteLoading(false);
+
         const feature = hit.features[0];
         setSelectedFeature(feature.attributes);
         setClickLocation({
@@ -578,11 +690,11 @@ export default function Explore() {
       console.warn("Identify error:", e);
     }
   };
+
   return (
     <>
       <ThemedView safe={true} style={styles.explore}>
-        {/* Permission Request Bar - Floating at the absolute top */}
-        {hasLocationPermission === false && (
+        {!isTripRouteMode && hasLocationPermission === false && (
           <View
             style={[
               styles.requestBar,
@@ -600,8 +712,6 @@ export default function Explore() {
             </TouchableOpacity>
           </View>
         )}
-
-        {/* The map fills the container entirely underneath */}
         <View style={styles.mapContainer}>
           <MapSettings
             config={{ apiKey: ARCGIS_API_KEY, license: ARCGIS_LICENSE_KEY }}
@@ -615,7 +725,7 @@ export default function Explore() {
                 scale: 250000,
               }}
             >
-              {FEATURE_LAYERS.destination && (
+              {!isTripRouteMode && FEATURE_LAYERS.destination && (
                 <FeatureLayer
                   ref={destLayerRef}
                   visible={showLandmarks}
@@ -625,7 +735,7 @@ export default function Explore() {
                   labels={destinationLabelConfig}
                 />
               )}
-              {FEATURE_LAYERS.branches && (
+              {!isTripRouteMode && FEATURE_LAYERS.branches && (
                 <FeatureLayer
                   ref={branchesLayerRef}
                   visible={showBranches}
@@ -639,7 +749,7 @@ export default function Explore() {
                 ref={mapViewRef}
                 style={styles.map}
                 viewpoint={mapViewpoint}
-                onTap={handleMapTap}
+                onTap={isTripRouteMode ? undefined : handleMapTap}
                 onMapLoaded={() => {
                   setMapStatus("ready");
                   setMapError(null);
@@ -657,7 +767,8 @@ export default function Explore() {
                     : undefined
                 }
               >
-                {searchPoint && (
+                {isTripRouteMode && <TripRouteOverlay route={tripRoute} />}
+                {!isTripRouteMode && searchPoint && (
                   <GraphicsOverlay>
                     <Graphic
                       geometry={{
@@ -669,7 +780,7 @@ export default function Explore() {
                     />
                   </GraphicsOverlay>
                 )}
-                {highlightGraphic && (
+                {!isTripRouteMode && highlightGraphic && (
                   <GraphicsOverlay>
                     <Graphic
                       geometry={highlightGraphic.geometry}
@@ -677,7 +788,7 @@ export default function Explore() {
                     />
                   </GraphicsOverlay>
                 )}
-                {searchRoute && (
+                {!isTripRouteMode && searchRoute && (
                   <GraphicsOverlay>
                     <Graphic
                       geometry={searchRoute}
@@ -692,7 +803,7 @@ export default function Explore() {
               </MapView>
             </Map>
           </MapSettings>
-          {selectedFeature && clickLocation && (
+          {!isTripRouteMode && selectedFeature && clickLocation && (
             <CustomPopup
               data={selectedFeature}
               location={clickLocation}
@@ -736,19 +847,18 @@ export default function Explore() {
               onPressNavigate={(featureData) => {
                 if (clickLocation) handleRouting(clickLocation);
               }}
+              routeLoading={routeLoading}
+              statusRoute={statusRoute}
+              onClearRoute={() => {
+                setSearchRoute(null);
+                setStatusRoute(null);
+                setRouteLoading(false);
+              }}
             />
           )}
           {mapStatus === "loading" && !mapConfigurationMissing && (
-            <View
-              style={[
-                styles.mapStatusCard,
-                { backgroundColor: colorTheme.uiBackground },
-              ]}
-            >
-              <ActivityIndicator size="small" color={Colors.primary} />
-              <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
-                Loading map...
-              </Text>
+            <View style={styles.loaderContainer}>
+              <ActivityIndicator size="large" color={colorTheme.primary} />
             </View>
           )}
           {mapStatus === "error" && (
@@ -787,185 +897,220 @@ export default function Explore() {
             </View>
           )}
         </View>
-
-        {/* Floating Search Container - Cleanly positioned below the request bar */}
-        <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
-          <View
-            style={[
-              styles.searchContainer,
-              {
-                top:
-                  hasLocationPermission === false
-                    ? insets.top + 65
-                    : insets.top + 10,
-              },
-            ]}
-          >
-            <View style={styles.inputWrapper}>
-              <ThemedTextInput
-                placeholder="Search"
-                value={searchQuery}
-                onChangeText={(text) => {
-                  setSearchQuery(text);
-                  if (text.trim().length > 0) setShowSuggestions(true);
-                }}
-                onFocus={() => {
-                  if (searchQuery.trim().length > 0) setShowSuggestions(true);
-                }}
-                returnKeyType="search"
-                onSubmitEditing={() => handleSearch(searchQuery)}
-                style={[
-                  styles.inputStyle,
-                  { borderColor: colorTheme.border, borderWidth: 2 },
-                ]}
-                ref={searchRef}
-                placeholderTextColor={colorTheme.placeholder}
-              />
-              <View style={styles.iconContainer}>
-                {searchQuery.length > 0 && !isSearching && (
-                  <TouchableOpacity
-                    onPress={() => {
-                      setSearchQuery("");
-                      clearMapSelection();
-                    }}
-                    style={styles.iconButton}
-                  >
-                    <Ionicons name="close-circle" size={20} color="#94A3B8" />
-                  </TouchableOpacity>
-                )}
-                {isSearching ? (
-                  <View style={styles.iconButton}>
-                    <ActivityIndicator size="small" color={Colors.primary} />
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    style={styles.iconButton}
-                    onPress={() => {
-                      handleSearch(searchQuery);
-                      searchRef.current.focus();
-                    }}
-                  >
-                    <Ionicons name="search" size={20} color="#64748B" />
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Suggestions Dropdown OR Filter Pills */}
-            {showSuggestions && suggestions.length > 0 ? (
-              <View
-                style={[
-                  styles.suggestionsDropdown,
-                  {
-                    backgroundColor: colorTheme.uiBackground,
-                    borderColor: colorTheme.border,
-                  },
-                ]}
-              >
-                {suggestions.map((item, index) => (
-                  <TouchableOpacity
-                    key={index}
-                    style={[
-                      styles.suggestionItem,
-                      index < suggestions.length - 1 && {
-                        borderBottomColor: colorTheme.border,
-                        borderBottomWidth: StyleSheet.hairlineWidth,
-                      },
-                    ]}
-                    onPress={() => {
-                      setSearchQuery(item.name);
-                      setShowSuggestions(false);
-                      handleSearch(item.name, item.type);
-                    }}
-                  >
-                    <Ionicons
-                      name="location-outline"
-                      size={20}
-                      color={colorTheme.title}
-                      style={{ marginRight: 10 }}
-                    />
-                    <Text
-                      style={{
-                        flex: 1,
-                        fontSize: 15,
-                        fontWeight: "500",
-                        color: colorTheme.text,
-                      }}
-                    >
-                      {item.name}
-                    </Text>
-                    <Text
-                      style={{
-                        fontSize: 12,
-                        opacity: 0.5,
-                        color: colorTheme.text,
-                      }}
-                    >
-                      {item.type === "landmark" ? "Landmark" : "Branch"}
-                    </Text>
-                  </TouchableOpacity>
-                ))}
-              </View>
-            ) : (
-              <ScrollView
-                horizontal
-                showsHorizontalScrollIndicator={false}
-                style={styles.filterContainer}
-                contentContainerStyle={styles.filterContent}
-              >
-                <TouchableOpacity
+        {isTripRouteMode && (
+          <TripRoutePanel
+            trip={tripRouteInfo}
+            route={tripRoute}
+            loading={tripRouteLoading}
+            error={tripRouteError}
+            colorTheme={colorTheme}
+            onRetry={loadTripRoute}
+            onExit={exitTripRoute}
+          />
+        )}
+        {!isTripRouteMode && (
+          <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
+            <View
+              style={[
+                styles.searchContainer,
+                {
+                  top:
+                    hasLocationPermission === false
+                      ? insets.top + 65
+                      : insets.top + 10,
+                },
+              ]}
+            >
+              <View style={styles.inputWrapper}>
+                <ThemedTextInput
+                  placeholder="Search"
+                  value={searchQuery}
+                  onChangeText={(text) => {
+                    setSearchQuery(text);
+                    if (text.trim().length > 0) setShowSuggestions(true);
+                  }}
+                  onFocus={() => {
+                    if (searchQuery.trim().length > 0) setShowSuggestions(true);
+                  }}
+                  returnKeyType="search"
+                  onSubmitEditing={() => handleSearch(searchQuery)}
                   style={[
-                    styles.filterPill,
-                    showLandmarks && styles.filterPillActive,
-                    showLandmarks && {
-                      backgroundColor: colorTheme.mapDestination,
+                    styles.inputStyle,
+                    { borderColor: colorTheme.border, borderWidth: 2 },
+                  ]}
+                  ref={searchRef}
+                  placeholderTextColor={colorTheme.placeholder}
+                />
+                <View style={styles.iconContainer}>
+                  {searchQuery.length > 0 && !isSearching && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSearchQuery("");
+                        clearMapSelection();
+                      }}
+                      style={styles.iconButton}
+                    >
+                      <Ionicons name="close-circle" size={20} color="#94A3B8" />
+                    </TouchableOpacity>
+                  )}
+                  {isSearching ? (
+                    <View style={styles.iconButton}>
+                      <ActivityIndicator size="small" color={Colors.primary} />
+                    </View>
+                  ) : (
+                    <TouchableOpacity
+                      style={styles.iconButton}
+                      onPress={() => {
+                        handleSearch(searchQuery);
+                        searchRef.current.focus();
+                      }}
+                    >
+                      <Ionicons name="search" size={20} color="#64748B" />
+                    </TouchableOpacity>
+                  )}
+                </View>
+              </View>
+
+              {/* Suggestions Dropdown OR Filter Pills */}
+              {showSuggestions && suggestions.length > 0 ? (
+                <View
+                  style={[
+                    styles.suggestionsDropdown,
+                    {
+                      backgroundColor: colorTheme.uiBackground,
+                      borderColor: colorTheme.border,
                     },
                   ]}
-                  onPress={() => setShowLandmarks(!showLandmarks)}
                 >
-                  <Text
-                    style={[
-                      styles.filterText,
-                      showLandmarks && { color: colorTheme.mapText },
-                    ]}
-                  >
-                    Landmarks
-                  </Text>
-                </TouchableOpacity>
-                <TouchableOpacity
-                  style={[
-                    styles.filterPill,
-                    showBranches && styles.filterPillActive,
-                    showBranches && { backgroundColor: colorTheme.mapBranch },
-                  ]}
-                  onPress={() => setShowBranches(!showBranches)}
+                  {suggestions.map((item, index) => (
+                    <TouchableOpacity
+                      key={index}
+                      style={[
+                        styles.suggestionItem,
+                        index < suggestions.length - 1 && {
+                          borderBottomColor: colorTheme.border,
+                          borderBottomWidth: StyleSheet.hairlineWidth,
+                        },
+                      ]}
+                      onPress={() => {
+                        setSearchQuery(item.name);
+                        setShowSuggestions(false);
+                        handleSearch(item.name, item.type);
+                      }}
+                    >
+                      <Ionicons
+                        name="location-outline"
+                        size={20}
+                        color={colorTheme.title}
+                        style={{ marginRight: 10 }}
+                      />
+                      <Text
+                        style={{
+                          flex: 1,
+                          fontSize: 15,
+                          fontWeight: "500",
+                          color: colorTheme.text,
+                        }}
+                      >
+                        {item.name}
+                      </Text>
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          opacity: 0.5,
+                          color: colorTheme.text,
+                        }}
+                      >
+                        {item.type === "landmark"
+                          ? "Landmark"
+                          : item.type === "geocoder"
+                            ? ""
+                            : "Branch"}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              ) : (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles.filterContainer}
+                  contentContainerStyle={styles.filterContent}
                 >
-                  <Text
+                  <TouchableOpacity
                     style={[
-                      styles.filterText,
-                      showBranches && { color: colorTheme.mapText },
+                      styles.filterPill,
+                      showLandmarks && styles.filterPillActive,
+                      showLandmarks && {
+                        backgroundColor: colorTheme.mapDestination,
+                      },
                     ]}
+                    onPress={() => setShowLandmarks(!showLandmarks)}
                   >
-                    Branches
-                  </Text>
-                </TouchableOpacity>
-              </ScrollView>
-            )}
-          </View>
-        </TouchableWithoutFeedback>
-        {/* My Location Button - Floating at the bottom right */}
-        <TouchableOpacity
-          style={[
-            styles.myLocationButton,
-            {
-              bottom: insets.bottom + 80,
-              backgroundColor: colorTheme.uiBackground,
-            },
-          ]}
-          onPress={handleGoToMyLocation}
-        >
-          <Ionicons name="locate" size={18} color={colorTheme.title} />
-        </TouchableOpacity>
+                    <Text
+                      style={[
+                        styles.filterText,
+                        showLandmarks && { color: colorTheme.mapText },
+                      ]}
+                    >
+                      Landmarks
+                    </Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    style={[
+                      styles.filterPill,
+                      showBranches && styles.filterPillActive,
+                      showBranches && { backgroundColor: colorTheme.mapBranch },
+                    ]}
+                    onPress={() => setShowBranches(!showBranches)}
+                  >
+                    <Text
+                      style={[
+                        styles.filterText,
+                        showBranches && { color: colorTheme.mapText },
+                      ]}
+                    >
+                      Branches
+                    </Text>
+                  </TouchableOpacity>
+                </ScrollView>
+              )}
+            </View>
+          </TouchableWithoutFeedback>
+        )}
+        {isTripRouteMode && (
+          <TouchableOpacity
+            style={[
+              styles.routeBackButton,
+              {
+                top: insets.top + 10,
+                backgroundColor: colorTheme.uiBackground,
+              },
+            ]}
+            onPress={exitTripRoute}
+            accessibilityRole="button"
+            accessibilityLabel="Exit trip route"
+          >
+            <Ionicons name="arrow-back" size={20} color={colorTheme.title} />
+            <Text style={[styles.routeBackText, { color: colorTheme.text }]}>
+              Trip Route
+            </Text>
+          </TouchableOpacity>
+        )}
+        {!isTripRouteMode && (
+          <TouchableOpacity
+            style={[
+              styles.myLocationButton,
+              {
+                bottom: insets.bottom + 80,
+                backgroundColor: colorTheme.uiBackground,
+              },
+            ]}
+            onPress={handleGoToMyLocation}
+          >
+            <Ionicons name="locate" size={18} color={colorTheme.title} />
+          </TouchableOpacity>
+        )}
       </ThemedView>
     </>
   );
@@ -987,6 +1132,7 @@ const styles = StyleSheet.create({
     zIndex: 5,
     flexDirection: "row",
     alignItems: "center",
+    justifyContent: "center",
     gap: 8,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -996,6 +1142,17 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.12,
     shadowRadius: 8,
     elevation: 4,
+  },
+  loaderContainer: {
+    position: "absolute",
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: "center",
+    alignItems: "center",
+    zIndex: 100,
+    elevation: 100,
   },
   mapStatusText: {
     flex: 1,
@@ -1018,11 +1175,11 @@ const styles = StyleSheet.create({
   },
   inputStyle: {
     flex: 1,
-    height: 44, // <-- Force a compact, minimized height (40-44 is ideal for touch targets)
-    paddingVertical: 0, // <-- Remove default vertical padding so text centers naturally
-    paddingLeft: 16, // <-- Keep a nice space on the left side
+    height: 44,
+    paddingVertical: 0,
+    paddingLeft: 16,
     borderRadius: 50,
-    paddingRight: 70, // Keep room for the clear/search icons on the right
+    paddingRight: 70,
   },
   suggestionsDropdown: {
     marginTop: 8,
@@ -1079,16 +1236,15 @@ const styles = StyleSheet.create({
     position: "absolute",
     left: 16,
     right: 16,
-    backgroundColor: "#EF4444", // Modern warning crimson
+    backgroundColor: "#EF4444",
     paddingVertical: 10,
     paddingHorizontal: 16,
-    borderRadius: 50, // Capsule design matching the search bar
+    borderRadius: 50,
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    zIndex: 20, // Sits safely above the map layers
+    zIndex: 20,
 
-    // Smooth Shadowing
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
@@ -1115,11 +1271,30 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     zIndex: 15,
-    // Smooth shadow for the floating effect
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
     shadowRadius: 4,
     elevation: 4,
+  },
+  routeBackButton: {
+    position: "absolute",
+    left: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    borderRadius: 20,
+    zIndex: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  routeBackText: {
+    fontSize: 14,
+    fontWeight: "700",
   },
 });

@@ -295,7 +295,29 @@ export default function TripDetails() {
             </View>
           )}
         </Card>
-
+        <TouchableOpacity
+          style={[
+            styles.routeButton,
+            (!trip.stops || trip.stops.length < 2) && styles.buttonDisabled,
+          ]}
+          onPress={() =>
+            router.push({
+              pathname: "/explore",
+              params: { mode: "saved-trip", tripId: String(numericTripId) },
+            })
+          }
+          disabled={!trip.stops || trip.stops.length < 2}
+          accessibilityRole="button"
+          accessibilityLabel="Show trip route"
+        >
+          <Ionicons name="map-outline" size={18} color="#fff" />
+          <Text style={styles.routeButtonText}>Show Trip Route</Text>
+        </TouchableOpacity>
+        {(!trip.stops || trip.stops.length < 2) && (
+          <Text style={styles.routeHint}>
+            Add at least two destinations to view a route.
+          </Text>
+        )}
         <Spacer height={20} />
         <ThemedText title={true} style={styles.sectionTitle}>
           Itinerary
@@ -311,8 +333,19 @@ export default function TripDetails() {
                   accessibilityRole="button"
                   accessibilityLabel="Cancel itinerary editing"
                 >
-                  <Ionicons name="close-outline" size={16} color={colorTheme.text} />
-                  <Text style={[styles.secondaryActionText, { color: colorTheme.text }]}>Cancel</Text>
+                  <Ionicons
+                    name="close-outline"
+                    size={16}
+                    color={colorTheme.text}
+                  />
+                  <Text
+                    style={[
+                      styles.secondaryActionText,
+                      { color: colorTheme.text },
+                    ]}
+                  >
+                    Cancel
+                  </Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={styles.primaryAction}
@@ -322,7 +355,9 @@ export default function TripDetails() {
                   accessibilityLabel="Save itinerary changes"
                 >
                   <Ionicons name="checkmark-outline" size={16} color="#fff" />
-                  <Text style={styles.primaryActionText}>{busy ? "Saving..." : "Save changes"}</Text>
+                  <Text style={styles.primaryActionText}>
+                    {busy ? "Saving..." : "Save changes"}
+                  </Text>
                 </TouchableOpacity>
               </>
             ) : (
@@ -332,7 +367,11 @@ export default function TripDetails() {
                 accessibilityRole="button"
                 accessibilityLabel="Edit itinerary destinations"
               >
-                <Ionicons name="create-outline" size={16} color={Colors.primary} />
+                <Ionicons
+                  name="create-outline"
+                  size={16}
+                  color={Colors.primary}
+                />
                 <Text style={styles.secondaryActionText}>Edit itinerary</Text>
               </TouchableOpacity>
             )}
@@ -389,7 +428,8 @@ export default function TripDetails() {
                   {[stop.city, stop.category].filter(Boolean).join(" · ")}
                 </ThemedText>
                 <ThemedText style={styles.stopDates}>
-                  {shortDate(stop.arrivalDate)} – {shortDate(stop.departureDate)}
+                  {shortDate(stop.arrivalDate)} –{" "}
+                  {shortDate(stop.departureDate)}
                 </ThemedText>
               </View>
               {editingStops && (
@@ -406,7 +446,11 @@ export default function TripDetails() {
                   accessibilityRole="button"
                   accessibilityLabel={`Remove ${stop.name} from itinerary`}
                 >
-                  <Ionicons name="trash-outline" size={18} color={Colors.warning} />
+                  <Ionicons
+                    name="trash-outline"
+                    size={18}
+                    color={Colors.warning}
+                  />
                 </TouchableOpacity>
               )}
             </View>
@@ -468,6 +512,7 @@ const createStyles = (colorTheme) =>
     container: {
       flex: 1,
       backgroundColor: colorTheme.background,
+      paddingBottom: 60,
     },
     centered: {
       justifyContent: "center",
@@ -485,7 +530,7 @@ const createStyles = (colorTheme) =>
       alignItems: "center",
       justifyContent: "space-between",
       gap: 10,
-      marginBottom: 14,
+      paddingBottom: 14,
     },
     header: {
       flex: 1,
@@ -516,6 +561,27 @@ const createStyles = (colorTheme) =>
     summaryText: {
       fontSize: 14,
       fontWeight: "600",
+    },
+    routeButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "center",
+      gap: 8,
+      marginTop: 14,
+      paddingVertical: 13,
+      borderRadius: 12,
+      backgroundColor: Colors.primary,
+    },
+    routeButtonText: {
+      color: "#fff",
+      fontSize: 14,
+      fontWeight: "700",
+    },
+    routeHint: {
+      marginTop: 6,
+      textAlign: "center",
+      fontSize: 12,
+      color: colorTheme.placeholder,
     },
     sectionTitle: {
       fontSize: 20,
