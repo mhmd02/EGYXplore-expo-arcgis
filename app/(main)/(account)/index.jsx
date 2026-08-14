@@ -79,7 +79,7 @@ export default function Account() {
       }
 
       const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        mediaTypes: ImagePicker.MediaType,
         allowsEditing: true,
         aspect: [1, 1],
         quality: 0.7,
@@ -94,12 +94,15 @@ export default function Account() {
           // Upload the image to the backend so it persists across sessions
           const uploadResult = await uploadProfilePicture(token, localUri);
           // Update local context with the server-returned URL (not the local URI)
-          await updateUser({ profilePictureUrl: uploadResult.profilePictureUrl });
+          await updateUser({
+            profilePictureUrl: uploadResult.profilePictureUrl,
+          });
         } catch (uploadError) {
           console.error("Error uploading profile picture:", uploadError);
           Alert.alert(
             "Upload Failed",
-            uploadError.message || "Could not upload profile picture. Please try again.",
+            uploadError.message ||
+              "Could not upload profile picture. Please try again.",
           );
         } finally {
           setUploadingAvatar(false);
@@ -405,7 +408,7 @@ const createStyles = (colorTheme) =>
     },
     scrollContent: {
       padding: 20,
-      paddingBottom: 60,
+      paddingBottom: 80,
     },
     // Header card
     headerCard: {
@@ -416,7 +419,7 @@ const createStyles = (colorTheme) =>
       paddingHorizontal: 20,
       borderWidth: 1,
       borderColor: colorTheme.border,
-      marginBottom: 20,
+      marginBottom: 12,
     },
     avatarContainer: {
       position: "relative",
@@ -537,7 +540,7 @@ const createStyles = (colorTheme) =>
       borderRadius: 16,
       borderWidth: 1,
       borderColor: colorTheme.border,
-      padding: 16,
+      padding: 12,
       alignItems: "center",
       marginBottom: 12,
     },

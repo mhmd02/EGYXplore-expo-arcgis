@@ -6,6 +6,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Dimensions,
+  ActivityIndicator,
 } from "react-native";
 import { LAYER_FIELDS } from "../config/arcgis";
 
@@ -21,6 +22,9 @@ export default function CustomPopup({
   draftStopNumber,
   draftCount,
   colorTheme,
+  routeLoading,
+  statusRoute,
+  onClearRoute,
 }) {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const screenWidth = Dimensions.get("screen").width;
@@ -86,35 +90,6 @@ export default function CustomPopup({
               </View>
               <Text style={styles.infoText}>{ticketPrice}</Text>
             </View>
-          </View>
-
-          <View style={styles.actionRow}>
-            {onNavigate && (
-              <TouchableOpacity
-                style={styles.actionBtn}
-                onPress={() => onNavigate(data)}
-              >
-                <Ionicons
-                  name="information-circle-outline"
-                  size={15}
-                  color={colorTheme.text}
-                />
-                <Text style={styles.actionText}>Details</Text>
-              </TouchableOpacity>
-            )}
-
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => onPressNavigate?.(data)}
-            >
-              <Ionicons
-                name="navigate-outline"
-                size={15}
-                color={colorTheme.text}
-              />
-              <Text style={styles.actionText}>Navigate</Text>
-            </TouchableOpacity>
-
             {onToggleDraft && (
               <TouchableOpacity
                 style={styles.actionBtn}
@@ -133,6 +108,64 @@ export default function CustomPopup({
                 >
                   {addedToDraft ? `Stop #${draftStopNumber}` : "Add"}
                 </Text>
+              </TouchableOpacity>
+            )}
+          </View>
+
+          <View style={styles.actionRow}>
+            {onNavigate && (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => onNavigate(data)}
+              >
+                <Ionicons
+                  name="information-circle-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+                <Text style={styles.actionText}>Details</Text>
+              </TouchableOpacity>
+            )}
+
+            {statusRoute ? (
+              <View style={styles.destRow}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => onClearRoute?.()}
+                >
+                  <Text style={styles.actionText}>{statusRoute}</Text>
+                  <Ionicons
+                    name="close-outline"
+                    size={16}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity style={styles.actionBtn}>
+                  <Text style={styles.actionText}>Start</Text>
+                  <Ionicons
+                    name="arrow-up-outline"
+                    size={16}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => onPressNavigate?.(data)}
+              >
+                <Ionicons
+                  name="navigate-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+                {routeLoading ? (
+                  <ActivityIndicator />
+                ) : (
+                  <Text style={styles.actionText}>Navigate</Text>
+                )}
               </TouchableOpacity>
             )}
           </View>
@@ -182,19 +215,53 @@ export default function CustomPopup({
               <Text style={styles.infoText}>{phone}</Text>
             </View>
           </View>
-
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => onPressNavigate?.(data)}
-            >
-              <Ionicons
-                name="navigate-outline"
-                size={15}
-                color={colorTheme.text}
-              />
-              <Text style={styles.actionText}>Navigate</Text>
-            </TouchableOpacity>
+            {statusRoute ? (
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  { flex: 1, justifyContent: "space-between" },
+                ]}
+                onPress={() => onClearRoute?.()}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={styles.actionText}>{statusRoute}</Text>
+                  <Ionicons
+                    name="close-outline"
+                    size={14}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </View>
+                <TouchableOpacity style={styles.actionBtn}>
+                  <Text style={{ color: colorTheme.text, marginLeft: 4 }}>
+                    Start
+                  </Text>
+                  <Ionicons
+                    name="arrow-up-outline"
+                    size={16}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => onPressNavigate?.(data)}
+              >
+                <Ionicons
+                  name="navigate-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+                {routeLoading ? (
+                  <ActivityIndicator />
+                ) : (
+                  <Text style={styles.actionText}>Navigate</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -213,22 +280,55 @@ export default function CustomPopup({
           <View style={styles.divider} />
 
           <Text style={[styles.infoText, { marginBottom: 12 }]}>
-            This is a searched place. Select a destination or branch marker for
-            tourism details.
+            {data.Description}
           </Text>
 
           <View style={styles.actionRow}>
-            <TouchableOpacity
-              style={styles.actionBtn}
-              onPress={() => onPressNavigate?.(data)}
-            >
-              <Ionicons
-                name="navigate-outline"
-                size={15}
-                color={colorTheme.text}
-              />
-              <Text style={styles.actionText}>Navigate</Text>
-            </TouchableOpacity>
+            {statusRoute ? (
+              <TouchableOpacity
+                style={[
+                  styles.actionBtn,
+                  { flex: 1, justifyContent: "space-between" },
+                ]}
+                onPress={() => onClearRoute?.()}
+              >
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={styles.actionText}>{statusRoute}</Text>
+                  <Ionicons
+                    name="close-outline"
+                    size={14}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </View>
+                <TouchableOpacity style={styles.actionBtn}>
+                  <Text style={{ color: colorTheme.text, marginLeft: 4 }}>
+                    Start
+                  </Text>
+                  <Ionicons
+                    name="arrow-up-outline"
+                    size={16}
+                    color={colorTheme.text}
+                  />
+                </TouchableOpacity>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => onPressNavigate?.(data)}
+              >
+                <Ionicons
+                  name="navigate-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+                {routeLoading ? (
+                  <ActivityIndicator />
+                ) : (
+                  <Text style={styles.actionText}>Navigate</Text>
+                )}
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>
@@ -251,9 +351,9 @@ const createStyles = (colorTheme) =>
       borderWidth: 1,
       borderColor: "rgba(150,150,150,0.15)",
       padding: 16,
-      marginBottom: 40,
+      marginBottom: 80,
       marginHorizontal: 20,
-      right: 10,
+      right: -5,
       elevation: 0,
       shadowOpacity: 0,
     },
@@ -271,9 +371,10 @@ const createStyles = (colorTheme) =>
       borderWidth: 1,
       borderColor: "rgba(150,150,150,0.15)",
       padding: 16,
-      marginBottom: 40,
+      marginBottom: 70,
       marginHorizontal: 20,
       elevation: 0,
+      right: -15,
       shadowOpacity: 0,
     },
     header: {
@@ -349,5 +450,10 @@ const createStyles = (colorTheme) =>
       color: colorTheme.text,
       fontSize: 13,
       fontWeight: "500",
+    },
+    destRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 16,
     },
   });

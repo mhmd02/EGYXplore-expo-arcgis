@@ -29,13 +29,14 @@ export default function ActivitiesLayout() {
                 }
               }}
               style={{
-                flexDirection: "row",
+                width: 40,
+                height: 40,
+                justifyContent: "center",
                 alignItems: "center",
-                paddingRight: 15,
-                marginTop: 10,
+                marginLeft: -8,
               }}
             >
-              <Ionicons name="arrow-back" size={28} color={colorTheme.title} />
+              <Ionicons name="arrow-back" size={24} color={colorTheme.title} />
             </TouchableOpacity>
           ),
         }}
