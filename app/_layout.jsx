@@ -7,8 +7,10 @@ import { ProgressProvider } from "../context/ProgressContext";
 import { UserProvider } from "../context/UserContext";
 import SettingsProvider from "../context/SettingsContext";
 import UriProvider from "../context/UriContext";
+import { useUser } from "../context/UserContext";
 import ContentProvider from "../context/ContentContext";
 import TripDraftProvider from "../context/TripDraftContext";
+import CustomThemedLoader from "../components/CustomThemedLoader";
 
 function MainLayout() {
   const context = useContext(ThemeContext);
@@ -17,7 +19,7 @@ function MainLayout() {
   }
   const { theme } = context;
   const colorTheme = Colors[theme] || Colors.light;
-
+  const { user, token, isLoading } = useUser();
   return (
     <>
       <StatusBar style={theme === "dark" ? "light" : "dark"} />
@@ -34,7 +36,9 @@ function MainLayout() {
         <Stack.Screen name="index" options={{ headerShown: false }} />
         <Stack.Screen name="(auth)" options={{ headerShown: false }} />
         <Stack.Screen name="(onboarding)" options={{ headerShown: false }} />
-        <Stack.Screen name="(main)" options={{ headerShown: false }} />
+        <Stack.Protected guard={Boolean(user && token)}>
+          <Stack.Screen name="(main)" options={{ headerShown: false }} />
+        </Stack.Protected>
       </Stack>
     </>
   );

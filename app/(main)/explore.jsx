@@ -203,6 +203,13 @@ export default function Explore() {
   };
 
   const loadTripRoute = async () => {
+    if (!currentLocation?.coords) {
+      Alert.alert(
+        "Location needed",
+        "Waiting for GPS signal. Please try again in a moment.",
+      );
+      return;
+    }
     const requestId = ++tripRouteRequest.current;
     const numericTripId = Number(tripId);
     if (!token || !Number.isInteger(numericTripId) || numericTripId <= 0) {
@@ -457,6 +464,43 @@ export default function Explore() {
       }
     }
   };
+  const ensureGpsReady = async () => {
+    if (hasLocationPermission === false) {
+      Alert.alert(
+        "Location access needed",
+        "Location permission is off, so we can't start navigation. Enable it in Settings to continue.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Allow", onPress: () => requestPermission() },
+        ],
+      );
+      return false;
+    }
+
+    const servicesEnabled = await Location.hasServicesEnabledAsync();
+    if (!servicesEnabled) {
+      Alert.alert(
+        "GPS is off",
+        "Your device's location/GPS is turned off. Please enable it to start navigation.",
+        [
+          { text: "Cancel", style: "cancel" },
+          { text: "Allow", onPress: () => requestPermission() },
+        ],
+      );
+      return false;
+    }
+
+    if (!currentLocation?.coords) {
+      Alert.alert(
+        "Waiting for GPS",
+        "We're still acquiring your location. Please try again in a moment.",
+      );
+      return false;
+    }
+
+    return true;
+  };
+
   const startNavigationForStops = async (routeStops) => {
     if (!currentLocation?.coords) {
       Alert.alert(
@@ -490,11 +534,13 @@ export default function Explore() {
     }
   };
 
-  const handleStartTripNavigation = () => {
+  const handleStartTripNavigation = async () => {
     if (!tripRouteInfo?.stops || tripRouteInfo.stops.length === 0) {
       Alert.alert("No stops", "This trip has no stops to navigate to.");
       return;
     }
+    if (!(await ensureGpsReady())) return;
+
     if (!currentLocation?.coords) {
       Alert.alert(
         "Location needed",
@@ -524,6 +570,7 @@ export default function Explore() {
     startNavigationForStops(routeStops);
   };
   const handleRouting = async (destinationPoint) => {
+    if (!(await ensureGpsReady())) return;
     if (!currentLocation?.coords) {
       Alert.alert(
         "Location needed",
@@ -576,14 +623,9 @@ export default function Explore() {
       setRouteLoading(false);
     }
   };
-  const handleStartNavigation = (destinationPoint) => {
-    if (!currentLocation?.coords || !destinationPoint) {
-      Alert.alert(
-        "Location needed",
-        "Waiting for GPS signal. Please try again in a moment.",
-      );
-      return;
-    }
+  const handleStartNavigation = async (destinationPoint) => {
+    if (!destinationPoint) return;
+    if (!(await ensureGpsReady())) return;
     const routeStops = [
       {
         point: {
@@ -1243,15 +1285,16 @@ export default function Explore() {
                       styles.filterPill,
                       showLandmarks && styles.filterPillActive,
                       showLandmarks && {
-                        backgroundColor: colorTheme.mapDestination,
+                        backgroundColor: colorTheme.uiBackground,
                       },
+                      { borderColor: colorTheme.border, borderWidth: 2 },
                     ]}
                     onPress={() => setShowLandmarks(!showLandmarks)}
                   >
                     <Text
                       style={[
                         styles.filterText,
-                        showLandmarks && { color: colorTheme.mapText },
+                        showLandmarks && { color: "#64748B" },
                       ]}
                     >
                       Landmarks
@@ -1261,14 +1304,17 @@ export default function Explore() {
                     style={[
                       styles.filterPill,
                       showBranches && styles.filterPillActive,
-                      showBranches && { backgroundColor: colorTheme.mapBranch },
+                      showBranches && {
+                        backgroundColor: colorTheme.uiBackground,
+                      },
+                      { borderColor: colorTheme.border, borderWidth: 2 },
                     ]}
                     onPress={() => setShowBranches(!showBranches)}
                   >
                     <Text
                       style={[
                         styles.filterText,
-                        showBranches && { color: colorTheme.mapText },
+                        showBranches && { color: "#64748B" },
                       ]}
                     >
                       Branches

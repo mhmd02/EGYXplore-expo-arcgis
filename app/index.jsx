@@ -39,6 +39,7 @@ export default function App() {
       <View
         style={[
           styles.container,
+          { backgroundColor: colorTheme.background },
           { paddingTop: insets.top, paddingBottom: insets.bottom },
         ]}
       >
@@ -82,7 +83,8 @@ const createStyles = (colorTheme) =>
     authText: {
       fontSize: 16,
       fontWeight: "600",
-      color: colorTheme.title, // You might want white text if the background is dark
+      color: colorTheme.title,
+      opacity: 0.4,
     },
     authContainer: {
       position: "absolute",
@@ -122,5 +124,6 @@ const createStyles = (colorTheme) =>
       color: colorTheme.text,
       letterSpacing: 4,
       textTransform: "uppercase",
+      opacity: 0.5,
     },
   });

@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, checkDeletedUser } from "./api";
 
 export const registerUser = async (data) => {
   const response = await fetch(`${API_BASE_URL}/MobileAccount/Register`, {
@@ -20,10 +20,7 @@ export const loginUser = async (data) => {
     body: JSON.stringify(data),
   });
 
-  if(response.status === 401){
-    const errorResult = await response.json();
-    throw new Error(errorResult.message || "Session expired or user deleted.");
-  }
+  await checkDeletedUser(response);
 
   const result = await response.json();
   if (!response.ok || !result.success) {

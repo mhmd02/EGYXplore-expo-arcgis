@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, checkDeletedUser } from "./api";
 import * as SecureStore from "expo-secure-store";
 
 export async function verifyMissionPhotos(missionId, base64Images) {
@@ -19,7 +19,7 @@ export async function verifyMissionPhotos(missionId, base64Images) {
       body: JSON.stringify({ images: base64Images }),
     },
   );
-
+  await checkDeletedUser(res);
   if (!res.ok) {
     const body = await res.text().catch(() => "");
     console.log("verify-photos failed:", res.status, body);

@@ -1,5 +1,5 @@
 import { File } from "expo-file-system";
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, checkDeletedUser } from "./api";
 
 export async function getProfile(token) {
   if (!token) {
@@ -11,8 +11,8 @@ export async function getProfile(token) {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   const result = await response.json().catch(() => ({}));
-
   if (!response.ok || !result.success || !result.user) {
     throw new Error(result.message || "Could not load your profile.");
   }
@@ -38,8 +38,8 @@ export async function updateProfile(token, profile) {
       interests: profile.interests ?? [],
     }),
   });
+  await checkDeletedUser(response);
   const result = await response.json().catch(() => ({}));
-
   if (!response.ok || !result.success || !result.user) {
     throw new Error(result.message || "Could not update your profile.");
   }
@@ -85,8 +85,8 @@ export async function uploadProfilePicture(token, imageUri) {
     },
     body: formData,
   });
+  await checkDeletedUser(res);
   const result = await response.json().catch(() => ({}));
-
   if (!response.ok || !result.success) {
     throw new Error(result.message || "Could not upload profile picture.");
   }
