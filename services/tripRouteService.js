@@ -7,6 +7,13 @@ export class TripRouteError extends Error {
     this.code = code;
   }
 }
+export const normalizeDestinationStatus = (raw) => {
+  if (!raw) return raw;
+  const match = raw.match(/\$(\w+)@/);
+  if (!match) return raw; // already a clean string — pass through unchanged
+  const className = match[1]; // e.g. "NotReached", "Reached", "Approaching"
+  return className.charAt(0).toLowerCase() + className.slice(1); // -> "notReached", "reached", "approaching"
+};
 
 export const isValidCoordinate = (latitude, longitude) =>
   Number.isFinite(latitude) &&

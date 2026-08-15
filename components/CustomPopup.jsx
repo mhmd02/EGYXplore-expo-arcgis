@@ -25,6 +25,9 @@ export default function CustomPopup({
   routeLoading,
   statusRoute,
   onClearRoute,
+  onStartNavigation,
+  onStopNavigation,
+  isNavigating,
 }) {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const screenWidth = Dimensions.get("screen").width;
@@ -141,10 +144,19 @@ export default function CustomPopup({
                     style={{ marginLeft: 4 }}
                   />
                 </TouchableOpacity>
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Text style={styles.actionText}>Start</Text>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() =>
+                    isNavigating
+                      ? onStopNavigation?.()
+                      : onStartNavigation?.(data)
+                  }
+                >
+                  <Text style={styles.actionText}>
+                    {isNavigating ? "Stop" : "Start"}
+                  </Text>
                   <Ionicons
-                    name="arrow-up-outline"
+                    name={isNavigating ? "stop-outline" : "arrow-up-outline"}
                     size={16}
                     color={colorTheme.text}
                     style={{ marginLeft: 4 }}
@@ -217,14 +229,16 @@ export default function CustomPopup({
           </View>
           <View style={styles.actionRow}>
             {statusRoute ? (
-              <TouchableOpacity
+              <View
                 style={[
                   styles.actionBtn,
                   { flex: 1, justifyContent: "space-between" },
                 ]}
-                onPress={() => onClearRoute?.()}
               >
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <TouchableOpacity
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                  onPress={() => onClearRoute?.()}
+                >
                   <Text style={styles.actionText}>{statusRoute}</Text>
                   <Ionicons
                     name="close-outline"
@@ -232,19 +246,27 @@ export default function CustomPopup({
                     color={colorTheme.text}
                     style={{ marginLeft: 4 }}
                   />
-                </View>
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Text style={{ color: colorTheme.text, marginLeft: 4 }}>
-                    Start
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() =>
+                    isNavigating
+                      ? onStopNavigation?.()
+                      : onStartNavigation?.(data)
+                  }
+                >
+                  <Text style={styles.actionText}>
+                    {isNavigating ? "Stop" : "Start"}
                   </Text>
                   <Ionicons
-                    name="arrow-up-outline"
+                    name={isNavigating ? "stop-outline" : "arrow-up-outline"}
                     size={16}
                     color={colorTheme.text}
                     style={{ marginLeft: 4 }}
                   />
                 </TouchableOpacity>
-              </TouchableOpacity>
+              </View>
             ) : (
               <TouchableOpacity
                 style={styles.actionBtn}
@@ -285,14 +307,16 @@ export default function CustomPopup({
 
           <View style={styles.actionRow}>
             {statusRoute ? (
-              <TouchableOpacity
+              <View
                 style={[
                   styles.actionBtn,
                   { flex: 1, justifyContent: "space-between" },
                 ]}
-                onPress={() => onClearRoute?.()}
               >
-                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <TouchableOpacity
+                  style={{ flexDirection: "row", alignItems: "center" }}
+                  onPress={() => onClearRoute?.()}
+                >
                   <Text style={styles.actionText}>{statusRoute}</Text>
                   <Ionicons
                     name="close-outline"
@@ -300,18 +324,27 @@ export default function CustomPopup({
                     color={colorTheme.text}
                     style={{ marginLeft: 4 }}
                   />
-                </View>
-                <TouchableOpacity style={styles.actionBtn}>
-                  <Text style={{ color: colorTheme.text, marginLeft: 4 }}>
-                    Start
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() =>
+                    isNavigating
+                      ? onStopNavigation?.()
+                      : onStartNavigation?.(data)
+                  }
+                >
+                  <Text style={styles.actionText}>
+                    {isNavigating ? "Stop" : "Start"}
                   </Text>
                   <Ionicons
-                    name="arrow-up-outline"
+                    name={isNavigating ? "stop-outline" : "arrow-up-outline"}
                     size={16}
                     color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
                   />
                 </TouchableOpacity>
-              </TouchableOpacity>
+              </View>
             ) : (
               <TouchableOpacity
                 style={styles.actionBtn}

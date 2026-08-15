@@ -41,6 +41,8 @@ import {
   normalizeTripStops,
   solveTripRoute,
   TripRouteError,
+  normalizeDestinationStatus,
+  buildArcgisTripStops,
 } from "../../services/tripRouteService.js";
 import TripRouteOverlay from "../../components/TripRouteOverlay.jsx";
 import TripRoutePanel from "../../components/TripRoutePanel.jsx";
@@ -108,11 +110,18 @@ const createLabelConfig = (field, colorTheme) => [
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
+  const [isNavigating, setIsNavigating] = useState(false);
+  const [navStatus, setNavStatus] = useState(false);
+  const trackerRef = useRef(null);
+
   const [searchQuery, setSearchQuery] = useState("");
   const [isSearching, setIsSearching] = useState(false);
   const [suggestions, setSuggestions] = useState([]);
   const [showSuggestions, setShowSuggestions] = useState(false);
   const [searchPoint, setSearchPoint] = useState(null);
+  const [hasArrived, setHasArrived] = useState(false);
+  const trackerBusyRef = useRef(false);
+
   const searchRef = useRef();
   const mapViewRef = useRef(null);
   const destLayerRef = useRef(null);
@@ -142,6 +151,7 @@ export default function Explore() {
   const [tripRouteInfo, setTripRouteInfo] = useState(null);
   const [tripRouteLoading, setTripRouteLoading] = useState(false);
   const [tripRouteError, setTripRouteError] = useState(null);
+
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
   const mapConfigurationMissing =
     !ARCGIS_API_KEY ||
@@ -324,7 +334,7 @@ export default function Explore() {
             new Set(localSuggestions.map((a) => a.name)),
           ).map((name) => localSuggestions.find((a) => a.name === name));
 
-          setSuggestions(unique.slice(0, 5)); // limit to top 5 results
+          setSuggestions(unique.slice(0, 5));
         } catch (e) {
           console.warn("Suggestion error:", e);
         }
@@ -342,7 +352,10 @@ export default function Explore() {
     let isCancelled = false;
 
     const startTracking = async () => {
-      if (hasLocationPermission && !isTripRouteMode) {
+      const shouldTrack =
+        hasLocationPermission && (!isTripRouteMode || isNavigating);
+
+      if (shouldTrack) {
         const sub = await Location.watchPositionAsync(
           {
             accuracy: Location.Accuracy.Highest,
@@ -373,6 +386,52 @@ export default function Explore() {
     };
   }, [hasLocationPermission, isTripRouteMode]);
 
+  useEffect(() => {
+    const updateTracker = async () => {
+      if (!isNavigating || !trackerRef.current || !currentLocation?.coords)
+        return;
+      if (trackerBusyRef.current) return;
+
+      trackerBusyRef.current = true;
+      try {
+        const status = await trackerRef.current.trackLocation({
+          latitude: currentLocation.coords.latitude,
+          longitude: currentLocation.coords.longitude,
+          speed: currentLocation.coords.speed || 0,
+        });
+        const destinationStatus = normalizeDestinationStatus(
+          status.destinationStatus,
+        );
+        const distKm = (status.distanceRemaining / 1000).toFixed(1);
+        const timeMin = Math.round(status.timeRemaining);
+        const instruction =
+          status.voiceText || status.destinationStatus || "Continue on route";
+
+        if (destinationStatus === "reached") {
+          if (status.remainingDestinationCount > 0) {
+            await trackerRef.current.switchToNextDestination();
+            setNavStatus("Arrived. Heading to next stop...");
+          } else {
+            setNavStatus("You've arrived at your destination.");
+            setHasArrived(true);
+            setTimeout(() => {
+              setHasArrived(false);
+              stopNavigation();
+            }, 3000);
+          }
+          return;
+        }
+
+        setNavStatus(`${distKm} km left · ${timeMin} min · ${instruction}`);
+      } catch (err) {
+        console.warn("Tracker update error:", err);
+      } finally {
+        trackerBusyRef.current = false;
+      }
+    };
+    updateTracker();
+  }, [currentLocation, isNavigating]);
+
   const requestPermission = async () => {
     const servicesEnabled = await Location.hasServicesEnabledAsync();
 
@@ -382,7 +441,6 @@ export default function Explore() {
           await Location.enableNetworkProviderAsync();
         } catch (e) {
           Alert.alert("Permission Denied", "Please turn on the GPS system.");
-          console.log("User refused to turn on system GPS toogle");
         }
       }
       await checkLocationStatus();
@@ -399,9 +457,81 @@ export default function Explore() {
       }
     }
   };
+  const startNavigationForStops = async (routeStops) => {
+    if (!currentLocation?.coords) {
+      Alert.alert(
+        "Location needed",
+        "Waiting for GPS signal. Please try again in a moment.",
+      );
+      return;
+    }
+    if (!routeStops || routeStops.length < 2) {
+      Alert.alert(
+        "Not enough stops",
+        "At least two stops are needed to navigate.",
+      );
+      return;
+    }
 
+    try {
+      trackerRef.current = await routing.createRouteTracker(routeStops, {
+        returnStops: true,
+      });
+      setIsNavigating(true);
+      setNavStatus("Starting navigation. Waiting for GPS...");
+      setMapViewpoint({
+        latitude: currentLocation.coords.latitude,
+        longitude: currentLocation.coords.longitude,
+        scale: 50000,
+      });
+    } catch (e) {
+      console.warn("Start navigation error:", e);
+      Alert.alert("Error", "Couldn't start navigation.");
+    }
+  };
+
+  const handleStartTripNavigation = () => {
+    if (!tripRouteInfo?.stops || tripRouteInfo.stops.length === 0) {
+      Alert.alert("No stops", "This trip has no stops to navigate to.");
+      return;
+    }
+    if (!currentLocation?.coords) {
+      Alert.alert(
+        "Location needed",
+        "Waiting for GPS signal. Please try again in a moment.",
+      );
+      return;
+    }
+
+    const routeStops = [
+      {
+        point: {
+          type: "point",
+          x: currentLocation.coords.longitude,
+          y: currentLocation.coords.latitude,
+        },
+        name: "My Location",
+      },
+      ...tripRouteInfo.stops.map((stop, idx) => ({
+        point: {
+          type: "point",
+          x: stop.longitude,
+          y: stop.latitude,
+        },
+        name: stop.name || `Stop ${idx + 1}`,
+      })),
+    ];
+    startNavigationForStops(routeStops);
+  };
   const handleRouting = async (destinationPoint) => {
-    if (!currentLocation?.coords || !destinationPoint) {
+    if (!currentLocation?.coords) {
+      Alert.alert(
+        "Location needed",
+        "Waiting for GPS signal. Please try again in a moment.",
+      );
+      return;
+    }
+    if (!destinationPoint) {
       setSearchRoute(null);
       setStatusRoute(null);
       return;
@@ -427,7 +557,7 @@ export default function Explore() {
           name: "Destination",
         },
       ];
-      const { routes } = await routing.solveRoute(stops);
+      const { routes } = await routing.solveRoute(stops, { returnStops: true });
       const route = routes[0];
       if (route?.geometry) {
         setSearchRoute(route.geometry);
@@ -446,18 +576,61 @@ export default function Explore() {
       setRouteLoading(false);
     }
   };
-
-  const clearMapSelection = () => {
-    setSelectedFeature(null);
-    setClickLocation(null);
-    setSearchPoint(null);
-    setLayerInfo(null);
-    setHighlightGraphic(null);
-    setSearchRoute(null);
-    setStatusRoute(null);
-    setRouteLoading(false);
+  const handleStartNavigation = (destinationPoint) => {
+    if (!currentLocation?.coords || !destinationPoint) {
+      Alert.alert(
+        "Location needed",
+        "Waiting for GPS signal. Please try again in a moment.",
+      );
+      return;
+    }
+    const routeStops = [
+      {
+        point: {
+          type: "point",
+          x: currentLocation.coords.longitude,
+          y: currentLocation.coords.latitude,
+        },
+        name: "My Location",
+      },
+      {
+        point: {
+          type: "point",
+          x: destinationPoint.longitude,
+          y: destinationPoint.latitude,
+        },
+        name: "Destination",
+      },
+    ];
+    startNavigationForStops(routeStops);
   };
-
+  const stopNavigation = () => {
+    setIsNavigating(false);
+    setHasArrived(false);
+    trackerRef.current = null;
+    trackerBusyRef.current = false;
+    setNavStatus("");
+    clearMapSelection();
+    if (tripRoute) {
+      setMapViewpoint({
+        latitude: 30.0444,
+        longitude: 31.2357,
+        scale: 500_000,
+      });
+    }
+  };
+  const clearMapSelection = () => {
+    if (!isNavigating) {
+      setSelectedFeature(null);
+      setClickLocation(null);
+      setSearchPoint(null);
+      setLayerInfo(null);
+      setHighlightGraphic(null);
+      setSearchRoute(null);
+      setStatusRoute(null);
+      setRouteLoading(false);
+    }
+  };
   const handleSearch = async (overrideQuery = null, preferredType = null) => {
     Keyboard.dismiss(); // Hides the keyboard
     const queryToUse =
@@ -613,7 +786,6 @@ export default function Explore() {
       setIsSearching(false);
     }
   };
-
   const handleGoToMyLocation = () => {
     // Check if we have successfully fetched the coordinates
     if (currentLocation && currentLocation.coords) {
@@ -641,21 +813,20 @@ export default function Explore() {
 
     try {
       if (!mapViewRef.current) return;
-
+      if (isNavigating) return;
       const { screenPoint, mapPoint } = event.nativeEvent;
       const results = await mapViewRef.current.identify(screenPoint, {
         tolerance: 12,
         maxResults: 1,
       });
-
       // Find the first layer result that has a feature (FEATURE_SELECTED).
       const hit = (results || []).find(
         (r) => r.features && r.features.length > 0,
       );
 
       if (hit) {
-        setSearchRoute(null);
         setStatusRoute(null);
+        setSearchRoute(null);
         setRouteLoading(false);
 
         const feature = hit.features[0];
@@ -665,8 +836,6 @@ export default function Explore() {
           longitude: mapPoint.longitude,
         });
         setMapViewpoint({
-          // Offset south so the tapped feature isn't hidden behind the popup,
-          // which docks near the bottom of the screen.
           latitude: mapPoint.latitude,
           longitude: mapPoint.longitude,
           scale: 15000,
@@ -683,7 +852,6 @@ export default function Explore() {
           });
         }
       } else {
-        // Tapped empty space -> clear selection (DESELECT_ALL).
         clearMapSelection();
       }
     } catch (e) {
@@ -803,59 +971,65 @@ export default function Explore() {
               </MapView>
             </Map>
           </MapSettings>
-          {!isTripRouteMode && selectedFeature && clickLocation && (
-            <CustomPopup
-              data={selectedFeature}
-              location={clickLocation}
-              layerInfo={layerInfo}
-              onClose={() => {
-                clearMapSelection();
-              }}
-              onNavigate={(featureData) => {
-                const destinationId = Number(featureData?.Id);
+          {!isTripRouteMode &&
+            selectedFeature &&
+            clickLocation &&
+            !isNavigating && (
+              <CustomPopup
+                data={selectedFeature}
+                location={clickLocation}
+                layerInfo={layerInfo}
+                onClose={() => {
+                  clearMapSelection();
+                }}
+                onNavigate={(featureData) => {
+                  const destinationId = Number(featureData?.Id);
 
-                if (!Number.isInteger(destinationId) || destinationId <= 0) {
-                  Alert.alert(
-                    "Destination unavailable",
-                    "Details are unavailable for this destination.",
-                  );
-                  return;
-                }
+                  if (!Number.isInteger(destinationId) || destinationId <= 0) {
+                    Alert.alert(
+                      "Destination unavailable",
+                      "Details are unavailable for this destination.",
+                    );
+                    return;
+                  }
 
-                clearMapSelection();
-                router.navigate(`/trips/${destinationId}`);
-              }}
-              onToggleDraft={(featureData) => {
-                const destinationId = Number(featureData?.Id);
-                if (!Number.isInteger(destinationId) || destinationId <= 0) {
-                  Alert.alert(
-                    "Destination unavailable",
-                    "This destination cannot be added to an itinerary.",
-                  );
-                  return;
+                  clearMapSelection();
+                  router.navigate(`/trips/${destinationId}`);
+                }}
+                onToggleDraft={(featureData) => {
+                  const destinationId = Number(featureData?.Id);
+                  if (!Number.isInteger(destinationId) || destinationId <= 0) {
+                    Alert.alert(
+                      "Destination unavailable",
+                      "This destination cannot be added to an itinerary.",
+                    );
+                    return;
+                  }
+                  toggleDraft(destinationId);
+                }}
+                isInDraft={(featureData) => isInDraft(Number(featureData?.Id))}
+                draftStopNumber={
+                  selectedFeature
+                    ? draftIds.indexOf(Number(selectedFeature?.Id)) + 1
+                    : 0
                 }
-                toggleDraft(destinationId);
-              }}
-              isInDraft={(featureData) => isInDraft(Number(featureData?.Id))}
-              draftStopNumber={
-                selectedFeature
-                  ? draftIds.indexOf(Number(selectedFeature?.Id)) + 1
-                  : 0
-              }
-              draftCount={draftCount}
-              colorTheme={colorTheme}
-              onPressNavigate={(featureData) => {
-                if (clickLocation) handleRouting(clickLocation);
-              }}
-              routeLoading={routeLoading}
-              statusRoute={statusRoute}
-              onClearRoute={() => {
-                setSearchRoute(null);
-                setStatusRoute(null);
-                setRouteLoading(false);
-              }}
-            />
-          )}
+                draftCount={draftCount}
+                colorTheme={colorTheme}
+                onPressNavigate={(featureData) => {
+                  if (clickLocation) handleRouting(clickLocation);
+                }}
+                onStartNavigation={(featureData) => {
+                  if (clickLocation) handleStartNavigation(clickLocation);
+                }}
+                routeLoading={routeLoading}
+                statusRoute={statusRoute}
+                onClearRoute={() => {
+                  setSearchRoute(null);
+                  setStatusRoute(null);
+                  setRouteLoading(false);
+                }}
+              />
+            )}
           {mapStatus === "loading" && !mapConfigurationMissing && (
             <View style={styles.loaderContainer}>
               <ActivityIndicator size="large" color={colorTheme.primary} />
@@ -906,9 +1080,37 @@ export default function Explore() {
             colorTheme={colorTheme}
             onRetry={loadTripRoute}
             onExit={exitTripRoute}
+            onStartNavigation={handleStartTripNavigation}
+            isNavigating={isNavigating}
           />
         )}
-        {!isTripRouteMode && (
+        {isNavigating && (
+          <View
+            style={[
+              styles.navBanner,
+              {
+                top: insets.top + 10,
+                backgroundColor: colorTheme.uiBackground,
+              },
+            ]}
+          >
+            <View style={{ flex: 1, paddingRight: 10 }}>
+              <Text style={[styles.navBannerText, { color: colorTheme.text }]}>
+                {navStatus}
+              </Text>
+            </View>
+            <TouchableOpacity
+              style={styles.stopNavButton}
+              onPress={() => {
+                exitTripRoute();
+                stopNavigation();
+              }}
+            >
+              <Text style={styles.stopNavText}>Stop</Text>
+            </TouchableOpacity>
+          </View>
+        )}
+        {!isTripRouteMode && !isNavigating && (
           <TouchableWithoutFeedback onPress={Keyboard.dismiss}>
             <View
               style={[
@@ -971,7 +1173,6 @@ export default function Explore() {
                 </View>
               </View>
 
-              {/* Suggestions Dropdown OR Filter Pills */}
               {showSuggestions && suggestions.length > 0 ? (
                 <View
                   style={[
@@ -1078,7 +1279,7 @@ export default function Explore() {
             </View>
           </TouchableWithoutFeedback>
         )}
-        {isTripRouteMode && (
+        {isTripRouteMode && !navStatus && (
           <TouchableOpacity
             style={[
               styles.routeBackButton,
@@ -1123,6 +1324,37 @@ const styles = StyleSheet.create({
   mapContainer: {
     flex: 1,
     overflow: "hidden",
+  },
+  navBanner: {
+    position: "absolute",
+    left: 16,
+    right: 16,
+    zIndex: 20,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    padding: 16,
+    borderRadius: 16,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  navBannerText: {
+    fontSize: 15,
+    fontWeight: "600",
+  },
+  stopNavButton: {
+    backgroundColor: "#EF4444",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+  },
+  stopNavText: {
+    color: "#fff",
+    fontWeight: "700",
+    fontSize: 14,
   },
   mapStatusCard: {
     position: "absolute",
