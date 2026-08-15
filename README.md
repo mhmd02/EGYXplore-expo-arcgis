@@ -60,6 +60,7 @@ Configure these variables:
 | `EXPO_PUBLIC_ARCGIS_LICENSE_KEY` | ArcGIS Runtime Lite license string |
 | `EXPO_PUBLIC_ARCGIS_DESTINATIONS_URL` | Destination FeatureServer layer URL |
 | `EXPO_PUBLIC_ARCGIS_BRANCHES_URL` | Branch FeatureServer layer URL |
+| `EXPO_PUBLIC_ARCGIS_UTILITIES_URL` | Utilities FeatureServer layer URL |
 | `EXPO_PUBLIC_ARCGIS_DESTINATIONS_PORTAL_ID` | Destination portal item ID, when required |
 | `EXPO_PUBLIC_ARCGIS_ROUTE_SERVICE_URL` | ArcGIS route service URL |
 
