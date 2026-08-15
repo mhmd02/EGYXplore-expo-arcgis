@@ -1,5 +1,4 @@
 import { File } from "expo-file-system";
-
 const API_BASE = process.env.EXPO_PUBLIC_API_BASE ?? "http://localhost:5217";
 
 export class AiAuthenticationError extends Error {
@@ -77,7 +76,10 @@ export async function sendChatMessage(
   });
 
   throwIfUnauthorized(res);
-
+  if (res.status === 401) {
+    const errorResult = await response.json();
+    throw new Error(errorResult.message || "Session expired or user deleted.");
+  }
   if (!res.ok) {
     const errorText = await res.text().catch(() => "(unreadable)");
     console.error(`[AiChat] ${res.status} ${res.statusText}:`, errorText);
@@ -94,6 +96,10 @@ export async function getHistory(token) {
     },
   });
   throwIfUnauthorized(res);
+  if (res.status === 401) {
+    const errorResult = await response.json();
+    throw new Error(errorResult.message || "Session expired or user deleted.");
+  }
   if (!res.ok) {
     throw new Error(`Failed to load chat history: ${res.status}`);
   }

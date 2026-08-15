@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, checkDeletedUser } from "./api";
 
 export const getMissions = async (token) => {
   const response = await fetch(`${API_BASE_URL}/MobileMission/AllMissions`, {
@@ -6,6 +6,7 @@ export const getMissions = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch missions: ${response.status}`);
   }
@@ -18,6 +19,7 @@ export const getRewards = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch rewards: ${response.status}`);
   }
@@ -30,6 +32,7 @@ export const getDestinations = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch destinations: ${response.status}`);
   }
@@ -48,7 +51,7 @@ export const getDestinationDetails = async (token, destinationId) => {
       body: JSON.stringify({ destinationId }),
     },
   );
-
+  await checkDeletedUser(response);
   if (!response.ok) {
     const rawText = await response.text();
     console.log("RAW ERROR BODY:", rawText); // ← temporary, check your Metro/dev console

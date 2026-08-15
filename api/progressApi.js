@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, checkDeletedUser } from "./api";
 
 export const getMyCompletedMissions = async (token) => {
   const response = await fetch(`${API_BASE_URL}/MobileMission/MyCompleted`, {
@@ -6,6 +6,8 @@ export const getMyCompletedMissions = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
+
   if (!response.ok) {
     throw new Error(`Failed to fetch completed missions: ${response.status}`);
   }
@@ -18,6 +20,7 @@ export const getMyBalance = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch your balance: ${response.status}`);
   }
@@ -38,6 +41,7 @@ export const completeMissionApi = async (
     },
     body: JSON.stringify({ missionId, verificationPayload, verificationToken }),
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
@@ -56,6 +60,7 @@ export const redeemRewardApi = async (token, rewardId) => {
     },
     body: JSON.stringify({ rewardId }),
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
@@ -71,6 +76,7 @@ export const getMyRedeemedRewards = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch redeemed rewards: ${response.status}`);
   }

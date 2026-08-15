@@ -1,4 +1,4 @@
-import { API_BASE_URL } from "./api";
+import { API_BASE_URL, checkDeletedUser } from "./api";
 
 export const createTripApi = async (token, payload) => {
   const response = await fetch(`${API_BASE_URL}/MobileTrip/CreateTrip`, {
@@ -9,6 +9,7 @@ export const createTripApi = async (token, payload) => {
     },
     body: JSON.stringify(payload),
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
@@ -24,6 +25,7 @@ export const getMyTrips = async (token) => {
       Authorization: `Bearer ${token}`,
     },
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     throw new Error(`Failed to fetch your trips: ${response.status}`);
   }
@@ -39,6 +41,7 @@ export const getTripById = async (token, tripId) => {
     },
     body: JSON.stringify({ tripId }),
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
@@ -64,10 +67,12 @@ export const updateTripDestinationsApi = async (
       body: JSON.stringify({ tripId, destinationIds }),
     },
   );
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
-      errorBody.message || `Failed to update trip destinations: ${response.status}`,
+      errorBody.message ||
+        `Failed to update trip destinations: ${response.status}`,
     );
   }
   return response.json();
@@ -82,6 +87,7 @@ export const completeTripApi = async (token, tripId) => {
     },
     body: JSON.stringify({ tripId }),
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
@@ -100,6 +106,7 @@ export const deleteTripApi = async (token, tripId) => {
     },
     body: JSON.stringify({ tripId }),
   });
+  await checkDeletedUser(response);
   if (!response.ok) {
     const errorBody = await response.json().catch(() => ({}));
     throw new Error(
