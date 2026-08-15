@@ -13,6 +13,8 @@ export default function TripRoutePanel({
   colorTheme,
   onRetry,
   onExit,
+  onStartNavigation,
+  isNavigating,
 }) {
   const [expanded, setExpanded] = useState(false);
   const tabBarClearance = useTabBarClearance();
@@ -133,30 +135,48 @@ export default function TripRoutePanel({
                 {stop.sequence}.
               </Text>
               <Text style={{ color: colorTheme.text, flex: 1 }}>
-                {stop.name}
+                {stop.name === "Stop 1" ? "Start" : stop.name}
               </Text>
             </View>
           ))}
-          <TouchableOpacity
-            onPress={onExit}
+          <View
             style={{
-              marginTop: 4,
-              padding: 10,
-              borderRadius: 10,
-              borderWidth: 1,
-              borderColor: colorTheme.border,
+              flexDirection: "row",
+              justifyContent: "flex-end",
             }}
           >
-            <Text
-              style={{
-                color: colorTheme.text,
-                textAlign: "center",
-                fontWeight: "700",
-              }}
-            >
-              Exit Route
-            </Text>
-          </TouchableOpacity>
+            {!isNavigating && (
+              <TouchableOpacity
+                onPress={onStartNavigation}
+                style={{
+                  marginTop: 4,
+                  padding: 10,
+                }}
+              >
+                <View
+                  style={{
+                    flexDirection: "row",
+                    justifyContent: "space-between",
+                    gap: 8,
+                  }}
+                >
+                  <Text
+                    style={{
+                      color: colorTheme.text,
+                      fontWeight: "700",
+                    }}
+                  >
+                    Start
+                  </Text>
+                  <Ionicons
+                    name="arrow-up-outline"
+                    size={16}
+                    color={colorTheme.text}
+                  />
+                </View>
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
     </View>
