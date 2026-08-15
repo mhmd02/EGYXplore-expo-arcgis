@@ -7,6 +7,7 @@ import {
   StyleSheet,
   Dimensions,
   ActivityIndicator,
+  Linking,
 } from "react-native";
 import { LAYER_FIELDS } from "../config/arcgis";
 
@@ -216,7 +217,13 @@ export default function CustomPopup({
               <Text style={styles.infoText}>{address}</Text>
             </View>
 
-            <View style={styles.infoRow}>
+            <TouchableOpacity
+              style={[styles.infoRow, !data.ContactNumber && { opacity: 0.4 }]}
+              onPress={() =>
+                data.ContactNumber && Linking.openURL(`tel:${phone}`)
+              }
+              disabled={!data.ContactNumber}
+            >
               <View style={styles.iconBox}>
                 <Ionicons
                   name="call-outline"
@@ -224,8 +231,18 @@ export default function CustomPopup({
                   color={colorTheme.text}
                 />
               </View>
-              <Text style={styles.infoText}>{phone}</Text>
-            </View>
+              <Text
+                style={[
+                  styles.infoText,
+                  data.ContactNumber && {
+                    textDecorationLine: "underline",
+                    color: "#3B82F6",
+                  },
+                ]}
+              >
+                {phone}
+              </Text>
+            </TouchableOpacity>
           </View>
           <View style={styles.actionRow}>
             {statusRoute ? (
@@ -261,6 +278,132 @@ export default function CustomPopup({
                   </Text>
                   <Ionicons
                     name={isNavigating ? "stop-outline" : "arrow-up-outline"}
+                    size={16}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
+              </View>
+            ) : (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => onPressNavigate?.(data)}
+              >
+                <Ionicons
+                  name="navigate-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+                {routeLoading ? (
+                  <ActivityIndicator />
+                ) : (
+                  <Text style={styles.actionText}>Navigate</Text>
+                )}
+              </TouchableOpacity>
+            )}
+          </View>
+        </View>
+      </View>
+    );
+  }
+
+  if (Id === "utilities") {
+    const name = data[LAYER_FIELDS.utilities] || "Nearby Utility";
+    const type = data.Type || "Utility";
+    const address = data.Address || data.City || "Unknown Address";
+    const phone = data.ContactNumber || "No Phone Provided";
+    const openHours = data.OpenHours || "Hours unavailable";
+
+    return (
+      <View style={styles.branchesOverlay}>
+        <View style={styles.branchesPopupContainer}>
+          <TouchableOpacity style={styles.closeButton} onPress={onClose}>
+            <Ionicons name="close" color={colorTheme.text} size={20} />
+          </TouchableOpacity>
+          <View style={styles.header}>
+            <Text style={styles.title}>{name}</Text>
+          </View>
+          <View style={styles.divider} />
+          <View style={styles.infoList}>
+            <View style={styles.infoRow}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="medical-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+              </View>
+              <Text style={styles.infoText}>{type}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="map-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+              </View>
+              <Text style={styles.infoText}>{address}</Text>
+            </View>
+            <View style={styles.infoRow}>
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="time-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+              </View>
+              <Text style={styles.infoText}>{openHours}</Text>
+            </View>
+            <TouchableOpacity
+              style={[styles.infoRow, !data.ContactNumber && { opacity: 0.4 }]}
+              onPress={() =>
+                data.ContactNumber && Linking.openURL(`tel:${phone}`)
+              }
+              disabled={!data.ContactNumber}
+            >
+              <View style={styles.iconBox}>
+                <Ionicons
+                  name="call-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+              </View>
+              <Text
+                style={[
+                  styles.infoText,
+                  data.ContactNumber && {
+                    textDecorationLine: "underline",
+                    color: "#3B82F6",
+                  },
+                ]}
+              >
+                {phone}
+              </Text>
+            </TouchableOpacity>
+          </View>
+          <View style={styles.actionRow}>
+            {statusRoute ? (
+              <View style={styles.destRow}>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => onClearRoute?.()}
+                >
+                  <Text style={styles.actionText}>{statusRoute}</Text>
+                  <Ionicons
+                    name="close-outline"
+                    size={16}
+                    color={colorTheme.text}
+                    style={{ marginLeft: 4 }}
+                  />
+                </TouchableOpacity>
+                <TouchableOpacity
+                  style={styles.actionBtn}
+                  onPress={() => onStartNavigation?.(data)}
+                >
+                  <Text style={styles.actionText}>Start</Text>
+                  <Ionicons
+                    name="arrow-up-outline"
                     size={16}
                     color={colorTheme.text}
                     style={{ marginLeft: 4 }}

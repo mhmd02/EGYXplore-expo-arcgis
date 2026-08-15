@@ -15,6 +15,7 @@ cp .env.example .env
 | `EXPO_PUBLIC_ARCGIS_LICENSE_KEY` | Explore | Client-visible ArcGIS Runtime Lite license |
 | `EXPO_PUBLIC_ARCGIS_DESTINATIONS_URL` | Explore | Destination FeatureServer layer URL |
 | `EXPO_PUBLIC_ARCGIS_BRANCHES_URL` | Explore | Branch FeatureServer layer URL |
+| `EXPO_PUBLIC_ARCGIS_UTILITIES_URL` | Explore | Utilities FeatureServer layer URL |
 | `EXPO_PUBLIC_ARCGIS_DESTINATIONS_PORTAL_ID` | Reserved | Present in config but unused by current map code |
 | `EXPO_PUBLIC_ARCGIS_ROUTE_SERVICE_URL` | Reserved | Present in config but not passed to route solving |
 

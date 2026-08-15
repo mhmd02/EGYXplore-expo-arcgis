@@ -12,6 +12,7 @@ import {
   Alert,
   ActivityIndicator,
   ScrollView,
+  Image,
 } from "react-native";
 import { useLocalSearchParams } from "expo-router";
 import {
@@ -70,6 +71,7 @@ const layerNameToId = (layerName = "") => {
   const name = layerName.toLowerCase();
   if (name.includes("destination")) return "destination";
   if (name.includes("branch")) return "branches";
+  if (name.includes("utilit")) return "utilities";
   return null;
 };
 
@@ -107,6 +109,66 @@ const createLabelConfig = (field, colorTheme) => [
   },
 ];
 
+const assetUri = (asset) => Image.resolveAssetSource(asset).uri;
+
+const UTILITY_TYPES = [
+  {
+    value: "Hospital",
+    label: "Hospitals",
+    icon: "medkit-outline",
+    color: "#DC2626",
+    foregroundColor: "#FFFFFF",
+    symbolUrl: assetUri(require("../../assets/map/hospital.png")),
+  },
+  {
+    value: "Pharmacy",
+    label: "Pharmacies",
+    icon: "flask-outline",
+    color: "#7C3AED",
+    foregroundColor: "#FFFFFF",
+    symbolUrl: assetUri(require("../../assets/map/pharmacy.png")),
+  },
+  {
+    value: "Police Station",
+    label: "Police",
+    icon: "shield-outline",
+    color: "#2563EB",
+    foregroundColor: "#FFFFFF",
+    symbolUrl: assetUri(require("../../assets/map/police.png")),
+  },
+  {
+    value: "Fire Station",
+    label: "Fire",
+    icon: "flame-outline",
+    color: "#EA580C",
+    foregroundColor: "#0F172A",
+    symbolUrl: assetUri(require("../../assets/map/fire.png")),
+  },
+];
+
+const UTILITIES_RENDERER = {
+  type: "unique-value",
+  fields: ["Type"],
+  defaultSymbol: {
+    type: "simple-marker",
+    style: "circle",
+    size: 12,
+    color: "#64748B",
+    outline: { color: "#FFFFFF", width: 2 },
+  },
+  defaultLabel: "Other utility",
+  uniqueValues: UTILITY_TYPES.map((utility) => ({
+    values: [utility.value],
+    label: utility.label,
+    symbol: {
+      type: "picture-marker",
+      url: utility.symbolUrl,
+      width: 22,
+      height: 22,
+    },
+  })),
+};
+
 export default function Explore() {
   const [hasLocationPermission, setHasLocationPermission] = useState(null);
   const [currentLocation, setCurrentLocation] = useState(null);
@@ -126,6 +188,7 @@ export default function Explore() {
   const mapViewRef = useRef(null);
   const destLayerRef = useRef(null);
   const branchesLayerRef = useRef(null);
+  const utilitiesLayerRef = useRef(null);
   const [selectedFeature, setSelectedFeature] = useState(null);
   const [clickLocation, setClickLocation] = useState(null);
   const [layerInfo, setLayerInfo] = useState(null);
@@ -136,6 +199,9 @@ export default function Explore() {
   const [routeLoading, setRouteLoading] = useState(false);
   const [showLandmarks, setShowLandmarks] = useState(true);
   const [showBranches, setShowBranches] = useState(true);
+  const [selectedUtilityTypes, setSelectedUtilityTypes] = useState(() =>
+    UTILITY_TYPES.map((item) => item.value),
+  );
   const [searchRoute, setSearchRoute] = useState(null);
   const [statusRoute, setStatusRoute] = useState(null);
   const { theme, setTheme } = useContext(ThemeContext);
@@ -156,7 +222,9 @@ export default function Explore() {
   const mapConfigurationMissing =
     !ARCGIS_API_KEY ||
     !ARCGIS_LICENSE_KEY ||
-    (!FEATURE_LAYERS.destination && !FEATURE_LAYERS.branches);
+    (!FEATURE_LAYERS.destination &&
+      !FEATURE_LAYERS.branches &&
+      !FEATURE_LAYERS.utilities);
 
   const destinationRenderer = useMemo(
     () => ({
@@ -194,6 +262,23 @@ export default function Explore() {
     () => createLabelConfig(LAYER_FIELDS.branches, colorTheme),
     [colorTheme.mapLabelText, colorTheme.mapLabelHalo],
   );
+  const utilityLabelConfig = useMemo(
+    () => createLabelConfig(LAYER_FIELDS.utilities, colorTheme),
+    [colorTheme.mapLabelText, colorTheme.mapLabelHalo],
+  );
+  const utilityDisplayFilter = useMemo(() => {
+    if (selectedUtilityTypes.length === 0) {
+      return { whereClause: "1 = 0", name: "No utility types selected" };
+    }
+
+    const values = selectedUtilityTypes
+      .map((type) => `'${type.replace(/'/g, "''")}'`)
+      .join(", ");
+    return {
+      whereClause: `Type IN (${values})`,
+      name: "Selected utility types",
+    };
+  }, [selectedUtilityTypes]);
 
   const checkLocationStatus = async () => {
     const { status } = await Location.getForegroundPermissionsAsync();
@@ -317,6 +402,38 @@ export default function Explore() {
                   type: "branch",
                 })),
               );
+          }
+          if (utilitiesLayerRef.current) {
+            const utilityWhere = `LOWER(${LAYER_FIELDS.utilities}) LIKE '%${term}%'`;
+            const queryParams = { whereClause: utilityWhere };
+
+            // Note: We DO NOT pass queryParams.geometry = currentLocation
+            const utilityRes =
+              await utilitiesLayerRef.current.queryFeatures(queryParams);
+
+            if (utilityRes) {
+              // Client-side distance sorting
+              if (currentLocation && currentLocation.coords) {
+                utilityRes.sort((a, b) => {
+                  const ptA = geometryEngine.project(a.geometry, 4326);
+                  const ptB = geometryEngine.project(b.geometry, 4326);
+                  if (!ptA || !ptB) return 0;
+                  const distA =
+                    Math.pow(ptA.y - currentLocation.coords.latitude, 2) +
+                    Math.pow(ptA.x - currentLocation.coords.longitude, 2);
+                  const distB =
+                    Math.pow(ptB.y - currentLocation.coords.latitude, 2) +
+                    Math.pow(ptB.x - currentLocation.coords.longitude, 2);
+                  return distA - distB;
+                });
+              }
+              localSuggestions.push(
+                ...utilityRes.map((f) => ({
+                  name: f.attributes[LAYER_FIELDS.utilities],
+                  type: "utility",
+                })),
+              );
+            }
           }
           if (localSuggestions.length === 0) {
             const globalResults = await geocoder.suggest(searchQuery.trim());
@@ -739,7 +856,80 @@ export default function Explore() {
         }
       }
 
-      // 3. Fallback to Global ArcGIS Geocoder
+      // 3. Search local Utilities next
+      if (
+        utilitiesLayerRef.current &&
+        preferredType !== "landmark" &&
+        preferredType !== "branch" &&
+        preferredType !== "geocoder"
+      ) {
+        const utilityWhere = `LOWER(${LAYER_FIELDS.utilities}) LIKE '%${term}%'`;
+        const queryParams = { whereClause: utilityWhere };
+        const utilityResults =
+          await utilitiesLayerRef.current.queryFeatures(queryParams);
+
+        if (
+          utilityResults &&
+          utilityResults.length > 0 &&
+          currentLocation &&
+          currentLocation.coords
+        ) {
+          utilityResults.sort((a, b) => {
+            const ptA = geometryEngine.project(a.geometry, 4326);
+            const ptB = geometryEngine.project(b.geometry, 4326);
+            if (!ptA || !ptB) return 0;
+            const distA =
+              Math.pow(ptA.y - currentLocation.coords.latitude, 2) +
+              Math.pow(ptA.x - currentLocation.coords.longitude, 2);
+            const distB =
+              Math.pow(ptB.y - currentLocation.coords.latitude, 2) +
+              Math.pow(ptB.x - currentLocation.coords.longitude, 2);
+            return distA - distB;
+          });
+        }
+        if (utilityResults && utilityResults.length > 1 && !preferredType) {
+          const matches = Array.from(
+            new Map(
+              utilityResults.map((feature) => [
+                feature.attributes[LAYER_FIELDS.utilities],
+                {
+                  name: feature.attributes[LAYER_FIELDS.utilities],
+                  type: "utility",
+                },
+              ]),
+            ).values(),
+          ).slice(0, 5);
+          setSuggestions(matches);
+          setShowSuggestions(true);
+          return;
+        }
+        if (utilityResults && utilityResults.length > 0) {
+          const feature = utilityResults[0];
+          const pt = feature.geometry;
+          if (pt) {
+            // Project native Web Mercator coordinates to WGS84 (Lat/Lon)
+            const projectedPt = geometryEngine.project(pt, 4326);
+            if (projectedPt) {
+              const lat = projectedPt.y;
+              const lon = projectedPt.x;
+              clearMapSelection();
+              setMapViewpoint({ latitude: lat, longitude: lon, scale: 15000 });
+              setSearchPoint({ latitude: lat, longitude: lon });
+              setClickLocation({ latitude: lat, longitude: lon });
+              setSelectedFeature(feature.attributes);
+              setLayerInfo("utilities");
+              if (selectedUtilityTypes.length === 0) {
+                setSelectedUtilityTypes([
+                  feature.attributes.Type || UTILITY_TYPES[0].value,
+                ]);
+              }
+              return;
+            }
+          }
+        }
+      }
+
+      // 4. Fallback to Global ArcGIS Geocoder
       // This sends "Cairo", for example, to the ArcGIS servers
       const results = await geocoder.geocode(queryToUse, {
         resultAttributeNames: ["*"],
@@ -911,6 +1101,19 @@ export default function Explore() {
                   renderer={branchesRenderer}
                   labelsEnabled={true}
                   labels={branchLabelConfig}
+                />
+              )}
+              {!isTripRouteMode && FEATURE_LAYERS.utilities && (
+                <FeatureLayer
+                  ref={utilitiesLayerRef}
+                  visible={selectedUtilityTypes.length > 0}
+                  url={FEATURE_LAYERS.utilities}
+                  minScale={160000}
+                  maxScale={0}
+                  renderer={UTILITIES_RENDERER}
+                  displayFilter={utilityDisplayFilter}
+                  labelsEnabled={true}
+                  labels={utilityLabelConfig}
                 />
               )}
               <MapView
@@ -1224,9 +1427,11 @@ export default function Explore() {
                       >
                         {item.type === "landmark"
                           ? "Landmark"
-                          : item.type === "geocoder"
-                            ? ""
-                            : "Branch"}
+                          : item.type === "branch"
+                            ? "Branch"
+                            : item.type === "utility"
+                              ? "Utility"
+                              : ""}
                       </Text>
                     </TouchableOpacity>
                   ))}
@@ -1274,6 +1479,49 @@ export default function Explore() {
                       Branches
                     </Text>
                   </TouchableOpacity>
+                  {UTILITY_TYPES.map((utility) => {
+                    const isActive = selectedUtilityTypes.includes(
+                      utility.value,
+                    );
+                    return (
+                      <TouchableOpacity
+                        key={utility.value}
+                        style={[
+                          styles.filterPill,
+                          styles.utilityPill,
+                          isActive && styles.filterPillActive,
+                          isActive && { backgroundColor: utility.color },
+                        ]}
+                        onPress={() =>
+                          setSelectedUtilityTypes((current) =>
+                            current.includes(utility.value)
+                              ? current.filter((type) => type !== utility.value)
+                              : [...current, utility.value],
+                          )
+                        }
+                        accessibilityRole="switch"
+                        accessibilityState={{ checked: isActive }}
+                        accessibilityLabel={`Toggle ${utility.label}`}
+                      >
+                        <Ionicons
+                          name={utility.icon}
+                          size={14}
+                          color={
+                            isActive ? utility.foregroundColor : utility.color
+                          }
+                        />
+                        <Text
+                          style={[
+                            styles.filterText,
+                            isActive && { color: utility.foregroundColor },
+                          ]}
+                          numberOfLines={1}
+                        >
+                          {utility.label}
+                        </Text>
+                      </TouchableOpacity>
+                    );
+                  })}
                 </ScrollView>
               )}
             </View>
@@ -1438,6 +1686,9 @@ const styles = StyleSheet.create({
     paddingBottom: 4,
   },
   filterPill: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -1445,6 +1696,10 @@ const styles = StyleSheet.create({
     marginRight: 8,
     borderWidth: 1,
     borderColor: "#CBD5E1",
+  },
+  utilityPill: {
+    minWidth: 112,
+    justifyContent: "center",
   },
   filterPillActive: {
     borderColor: "#FFFFFF",
