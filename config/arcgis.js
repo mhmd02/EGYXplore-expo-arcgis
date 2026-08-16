@@ -8,6 +8,7 @@ export const FEATURE_LAYERS = {
   destination: process.env.EXPO_PUBLIC_ARCGIS_DESTINATIONS_URL,
   branches: process.env.EXPO_PUBLIC_ARCGIS_BRANCHES_URL,
   utilities: process.env.EXPO_PUBLIC_ARCGIS_UTILITIES_URL,
+  GeoprocessingPane: process.env.EXPO_PUBLIC_ARCGIS_GEOPROCESSING_PANE,
 };
 export const LAYER_FIELDS = {
   destination: "English_Name", // <- replace with actual field name from metadata

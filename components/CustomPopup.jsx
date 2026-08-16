@@ -10,6 +10,7 @@ import {
   Linking,
 } from "react-native";
 import { LAYER_FIELDS } from "../config/arcgis";
+import { useRouter } from "expo-router";
 
 export default function CustomPopup({
   data,
@@ -32,6 +33,7 @@ export default function CustomPopup({
 }) {
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const screenWidth = Dimensions.get("screen").width;
+  const router = useRouter();
   if (!data) return null;
 
   const Id = layerInfo;
@@ -181,6 +183,9 @@ export default function CustomPopup({
                 )}
               </TouchableOpacity>
             )}
+            <TouchableOpacity onPress={() => router.push("/indoor")}>
+              <Text>Indoor</Text>
+            </TouchableOpacity>
           </View>
         </View>
       </View>
