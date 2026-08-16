@@ -8,6 +8,7 @@
     "@microsoft/signalr": "^10.0.0",
     "@react-native-async-storage/async-storage": "2.2.0",
     "@react-native-community/datetimepicker": "9.1.0",
+    "@react-native-picker/picker": "2.11.4",
     "expo": "~57.0.7",
     "expo-arcgis": "^0.3.3",
     "expo-audio": "~57.0.3",

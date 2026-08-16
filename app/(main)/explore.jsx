@@ -266,6 +266,7 @@ export default function Explore() {
     () => createLabelConfig(LAYER_FIELDS.utilities, colorTheme),
     [colorTheme.mapLabelText, colorTheme.mapLabelHalo],
   );
+  
   const utilityDisplayFilter = useMemo(() => {
     if (selectedUtilityTypes.length === 0) {
       return { whereClause: "1 = 0", name: "No utility types selected" };
@@ -970,9 +971,6 @@ export default function Explore() {
           }
         }
       }
-
-      // 4. Fallback to Global ArcGIS Geocoder
-      // This sends "Cairo", for example, to the ArcGIS servers
       const results = await geocoder.geocode(queryToUse, {
         resultAttributeNames: ["*"],
       });
