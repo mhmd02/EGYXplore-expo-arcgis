@@ -85,7 +85,7 @@ export async function uploadProfilePicture(token, imageUri) {
     },
     body: formData,
   });
-  await checkDeletedUser(res);
+  await checkDeletedUser(response);
   const result = await response.json().catch(() => ({}));
   if (!response.ok || !result.success) {
     throw new Error(result.message || "Could not upload profile picture.");
