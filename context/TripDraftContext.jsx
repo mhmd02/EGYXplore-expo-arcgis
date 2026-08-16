@@ -17,6 +17,14 @@ import {
 
 const TripDraftContext = createContext(null);
 
+const emptyFormDraft = () => ({
+  title: "",
+  budget: "",
+  companions: "",
+  startDate: null,
+  endDate: null,
+});
+
 // The in-progress trip lives on the device: tapping "Add to Itinerary" should be
 // instant, so nothing is sent to the server until the user saves. Keyed per user
 // so one account's draft never shows up under another on a shared device.
@@ -25,6 +33,8 @@ const draftKey = (userId) => `trip-draft:${userId ?? "anonymous"}`;
 export default function TripDraftProvider({ children }) {
   const { token, user, isLoading: userLoading } = useUser();
   const [draftIds, setDraftIds] = useState([]);
+  const [formDraft, setFormDraft] = useState(emptyFormDraft);
+  const [draftHydrated, setDraftHydrated] = useState(false);
   const [savedTrips, setSavedTrips] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -38,12 +48,16 @@ export default function TripDraftProvider({ children }) {
   useEffect(() => {
     if (userLoading) return;
 
+    setDraftHydrated(false);
+
     if (!token) {
       hydratedFor.current = null;
       setDraftIds([]);
+      setFormDraft(emptyFormDraft());
       setSavedTrips([]);
       setError(null);
       setLoading(false);
+      setDraftHydrated(true);
       return;
     }
 
@@ -52,13 +66,29 @@ export default function TripDraftProvider({ children }) {
       try {
         const stored = await AsyncStorage.getItem(draftKey(userId));
         if (!active) return;
-        const parsed = stored ? JSON.parse(stored) : [];
-        setDraftIds(Array.isArray(parsed) ? parsed : []);
+        const parsed = stored ? JSON.parse(stored) : null;
+
+        // Older app versions stored only the destination ID array.
+        if (Array.isArray(parsed)) {
+          setDraftIds(parsed);
+          setFormDraft(emptyFormDraft());
+        } else {
+          setDraftIds(
+            Array.isArray(parsed?.destinationIds) ? parsed.destinationIds : [],
+          );
+          setFormDraft(normalizeStoredForm(parsed?.form));
+        }
       } catch (err) {
         console.log("Failed to restore trip draft:", err);
-        if (active) setDraftIds([]);
+        if (active) {
+          setDraftIds([]);
+          setFormDraft(emptyFormDraft());
+        }
       } finally {
-        if (active) hydratedFor.current = userId;
+        if (active) {
+          hydratedFor.current = userId;
+          setDraftHydrated(true);
+        }
       }
     })();
 
@@ -67,13 +97,19 @@ export default function TripDraftProvider({ children }) {
     };
   }, [token, userId, userLoading]);
 
-  // Persist on every change, but only once this user's draft is hydrated.
+  // Persist shortly after each change, but only once this user's draft is hydrated.
   useEffect(() => {
     if (hydratedFor.current !== userId) return;
-    AsyncStorage.setItem(draftKey(userId), JSON.stringify(draftIds)).catch(
-      (err) => console.log("Failed to persist trip draft:", err),
-    );
-  }, [draftIds, userId]);
+
+    const timeout = setTimeout(() => {
+      AsyncStorage.setItem(
+        draftKey(userId),
+        JSON.stringify({ destinationIds: draftIds, form: formDraft }),
+      ).catch((err) => console.log("Failed to persist trip draft:", err));
+    }, 250);
+
+    return () => clearTimeout(timeout);
+  }, [draftIds, formDraft, userId]);
 
   const refreshTrips = useCallback(async () => {
     if (!token) {
@@ -133,6 +169,15 @@ export default function TripDraftProvider({ children }) {
 
   const clearDraft = () => setDraftIds([]);
 
+  const updateFormDraft = useCallback((form) => {
+    setFormDraft(serializeFormDraft(form));
+  }, []);
+
+  const clearFullDraft = () => {
+    setDraftIds([]);
+    setFormDraft(emptyFormDraft());
+  };
+
   // Sends the draft as one trip. The draft is only cleared once the server has
   // accepted it, so a failed save (offline, validation) keeps the user's picks.
   const saveTrip = async (form) => {
@@ -147,7 +192,7 @@ export default function TripDraftProvider({ children }) {
 
     const created = await createTripApi(token, payload);
     setSavedTrips((prev) => [created, ...prev]);
-    clearDraft();
+    clearFullDraft();
     return created;
   };
 
@@ -174,6 +219,9 @@ export default function TripDraftProvider({ children }) {
       value={{
         draftIds,
         draftCount: draftIds.length,
+        formDraft,
+        draftHydrated,
+        updateFormDraft,
         isInDraft,
         toggleDraft,
         removeFromDraft,
@@ -200,6 +248,28 @@ function toApiDate(value) {
   const month = `${date.getMonth() + 1}`.padStart(2, "0");
   const day = `${date.getDate()}`.padStart(2, "0");
   return `${date.getFullYear()}-${month}-${day}`;
+}
+
+function serializeFormDraft(form) {
+  return {
+    title: form?.title ?? "",
+    budget: String(form?.budget ?? ""),
+    companions: String(form?.companions ?? ""),
+    startDate: form?.startDate ? toApiDate(form.startDate) : null,
+    endDate: form?.endDate ? toApiDate(form.endDate) : null,
+  };
+}
+
+function normalizeStoredForm(form) {
+  if (!form || typeof form !== "object") return emptyFormDraft();
+
+  return {
+    title: typeof form.title === "string" ? form.title : "",
+    budget: typeof form.budget === "string" ? form.budget : "",
+    companions: typeof form.companions === "string" ? form.companions : "",
+    startDate: typeof form.startDate === "string" ? form.startDate : null,
+    endDate: typeof form.endDate === "string" ? form.endDate : null,
+  };
 }
 
 export function useTripDraft() {

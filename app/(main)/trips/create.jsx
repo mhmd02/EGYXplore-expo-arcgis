@@ -10,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { useContext, useMemo, useRef, useState } from "react";
+import { useContext, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import DateTimePicker from "@react-native-community/datetimepicker";
@@ -29,6 +29,7 @@ import ThemedButton from "../../../components/ThemedButton";
 import Card from "../../../components/Card";
 import Spacer from "../../../components/Spacer";
 import SuccessModal from "../../../components/SuccessModal";
+import CustomThemedLoader from "../../../components/CustomThemedLoader";
 import { useTabBarClearance } from "../../../constants/layout";
 
 const formatDate = (date) =>
@@ -37,6 +38,27 @@ const formatDate = (date) =>
     month: "short",
     day: "numeric",
   });
+
+const createFormValues = (draft) => {
+  const today = new Date();
+  const defaultEndDate = new Date(today);
+  defaultEndDate.setDate(defaultEndDate.getDate() + 6);
+
+  return {
+    title: draft?.title ?? "",
+    budget: draft?.budget ?? "",
+    companions: draft?.companions ?? "",
+    startDate: parseDraftDate(draft?.startDate) ?? today,
+    endDate: parseDraftDate(draft?.endDate) ?? defaultEndDate,
+  };
+};
+
+const parseDraftDate = (value) => {
+  if (!value) return null;
+  const [year, month, day] = value.split("-").map(Number);
+  const date = new Date(year, month - 1, day);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
 
 const STOP_MOVE_DISTANCE = 76;
 
@@ -57,8 +79,7 @@ function DraggableStop({
     () =>
       PanResponder.create({
         onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gesture) =>
-          Math.abs(gesture.dy) > 3,
+        onMoveShouldSetPanResponder: (_, gesture) => Math.abs(gesture.dy) > 3,
         onPanResponderGrant: () => {
           setDragging(true);
           onDragChange(true);
@@ -157,6 +178,9 @@ export default function CreateTrip() {
   const {
     draftIds,
     draftCount,
+    formDraft,
+    draftHydrated,
+    updateFormDraft,
     removeFromDraft,
     moveDraftItem,
     clearDraft,
@@ -177,6 +201,7 @@ export default function CreateTrip() {
     handleSubmit,
     watch,
     setValue,
+    reset,
     formState: { errors },
   } = useForm({
     resolver: zodResolver(tripSchema),
@@ -193,14 +218,20 @@ export default function CreateTrip() {
   const startDate = watch("startDate");
   const endDate = watch("endDate");
 
+  useEffect(() => {
+    if (!draftHydrated) return;
+
+    reset(createFormValues(formDraft));
+    const subscription = watch((form) => updateFormDraft(form));
+    return () => subscription.unsubscribe();
+  }, [draftHydrated, reset, updateFormDraft, watch]);
+
   // The picks come from the already-loaded destinations list, in the order the
   // user added them — that order becomes Visit_Order on the server.
   const selectedDestinations = useMemo(() => {
     if (!destinations) return [];
     const byId = new Map(destinations.map((dest) => [dest.id, dest]));
-    return draftIds
-      .map((id) => byId.get(id))
-      .filter(Boolean);
+    return draftIds.map((id) => byId.get(id)).filter(Boolean);
   }, [destinations, draftIds]);
 
   const onSubmit = async (data) => {
@@ -216,6 +247,14 @@ export default function CreateTrip() {
     }
   };
 
+  if (!draftHydrated) {
+    return (
+      <ThemedView style={[styles.container, styles.centered]}>
+        <CustomThemedLoader />
+      </ThemedView>
+    );
+  }
+
   const handlePickerChange = (field) => (event, selected) => {
     if (Platform.OS !== "ios") setOpenPicker(null);
     if (event.type === "dismissed" || !selected) return;
@@ -230,11 +269,7 @@ export default function CreateTrip() {
   if (draftCount === 0 && !savedTrip) {
     return (
       <ThemedView style={[styles.container, styles.centered]}>
-        <Ionicons
-          name="map-outline"
-          size={48}
-          color={colorTheme.placeholder}
-        />
+        <Ionicons name="map-outline" size={48} color={colorTheme.placeholder} />
         <Spacer height={12} />
         <ThemedText title={true} style={styles.emptyTitle}>
           No destinations yet
@@ -352,13 +387,17 @@ export default function CreateTrip() {
                   accessibilityRole="button"
                   accessibilityLabel="Clear all chosen destinations"
                 >
-                  <Ionicons name="trash-outline" size={14} color={Colors.warning} />
+                  <Ionicons
+                    name="trash-outline"
+                    size={14}
+                    color={Colors.warning}
+                  />
                   <Text style={styles.clearButtonText}>Clear all</Text>
                 </TouchableOpacity>
               </View>
               <ThemedText style={styles.sectionHint}>
-                {draftCount} {draftCount === 1 ? "destination" : "destinations"}, in
-                visiting order. Drag the handle to reorder.
+                {draftCount} {draftCount === 1 ? "destination" : "destinations"}
+                , in visiting order. Drag the handle to reorder.
               </ThemedText>
               <Spacer height={12} />
 
@@ -385,131 +424,133 @@ export default function CreateTrip() {
               </ThemedText>
               <Spacer height={12} />
 
-          <Controller
-            control={control}
-            name="title"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <ThemedTextInput
-                style={styles.inputField}
-                placeholder="Trip name"
-                placeholderTextColor={colorTheme.placeholder}
-                value={value}
-                onBlur={onBlur}
-                onChangeText={onChange}
+              <Controller
+                control={control}
+                name="title"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <ThemedTextInput
+                    style={styles.inputField}
+                    placeholder="Trip name"
+                    placeholderTextColor={colorTheme.placeholder}
+                    value={value}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                  />
+                )}
               />
-            )}
-          />
-          {errors.title && (
-            <Text style={styles.errorText}>{errors.title.message}</Text>
-          )}
+              {errors.title && (
+                <Text style={styles.errorText}>{errors.title.message}</Text>
+              )}
 
-          <Controller
-            control={control}
-            name="budget"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <ThemedTextInput
-                style={styles.inputField}
-                placeholder="Budget (optional)"
-                keyboardType="numeric"
-                placeholderTextColor={colorTheme.placeholder}
-                value={String(value ?? "")}
-                onBlur={onBlur}
-                onChangeText={onChange}
+              <Controller
+                control={control}
+                name="budget"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <ThemedTextInput
+                    style={styles.inputField}
+                    placeholder="Budget (optional)"
+                    keyboardType="numeric"
+                    placeholderTextColor={colorTheme.placeholder}
+                    value={String(value ?? "")}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                  />
+                )}
               />
-            )}
-          />
-          {errors.budget && (
-            <Text style={styles.errorText}>{errors.budget.message}</Text>
-          )}
+              {errors.budget && (
+                <Text style={styles.errorText}>{errors.budget.message}</Text>
+              )}
 
-          <Controller
-            control={control}
-            name="companions"
-            render={({ field: { onChange, onBlur, value } }) => (
-              <ThemedTextInput
-                style={styles.inputField}
-                placeholder="Companions (optional)"
-                keyboardType="number-pad"
-                placeholderTextColor={colorTheme.placeholder}
-                value={String(value ?? "")}
-                onBlur={onBlur}
-                onChangeText={onChange}
+              <Controller
+                control={control}
+                name="companions"
+                render={({ field: { onChange, onBlur, value } }) => (
+                  <ThemedTextInput
+                    style={styles.inputField}
+                    placeholder="Companions (optional)"
+                    keyboardType="number-pad"
+                    placeholderTextColor={colorTheme.placeholder}
+                    value={String(value ?? "")}
+                    onBlur={onBlur}
+                    onChangeText={onChange}
+                  />
+                )}
               />
-            )}
-          />
-          {errors.companions && (
-            <Text style={styles.errorText}>{errors.companions.message}</Text>
-          )}
+              {errors.companions && (
+                <Text style={styles.errorText}>
+                  {errors.companions.message}
+                </Text>
+              )}
 
-          <View style={styles.dateRow}>
-            <View style={{ flex: 1 }}>
-              <ThemedText style={styles.fieldLabel}>From</ThemedText>
-              <TouchableOpacity
-                style={styles.dateField}
-                onPress={() => setOpenPicker("start")}
-                accessibilityRole="button"
-                accessibilityLabel={`Start date, ${formatDate(startDate)}`}
-              >
-                <ThemedText style={styles.dateText}>
-                  {formatDate(startDate)}
-                </ThemedText>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={colorTheme.placeholder}
+              <View style={styles.dateRow}>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.fieldLabel}>From</ThemedText>
+                  <TouchableOpacity
+                    style={styles.dateField}
+                    onPress={() => setOpenPicker("start")}
+                    accessibilityRole="button"
+                    accessibilityLabel={`Start date, ${formatDate(startDate)}`}
+                  >
+                    <ThemedText style={styles.dateText}>
+                      {formatDate(startDate)}
+                    </ThemedText>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color={colorTheme.placeholder}
+                    />
+                  </TouchableOpacity>
+                </View>
+                <View style={{ flex: 1 }}>
+                  <ThemedText style={styles.fieldLabel}>To</ThemedText>
+                  <TouchableOpacity
+                    style={styles.dateField}
+                    onPress={() => setOpenPicker("end")}
+                    accessibilityRole="button"
+                    accessibilityLabel={`End date, ${formatDate(endDate)}`}
+                  >
+                    <ThemedText style={styles.dateText}>
+                      {formatDate(endDate)}
+                    </ThemedText>
+                    <Ionicons
+                      name="calendar-outline"
+                      size={18}
+                      color={colorTheme.placeholder}
+                    />
+                  </TouchableOpacity>
+                </View>
+              </View>
+              {errors.endDate && (
+                <Text style={styles.errorText}>{errors.endDate.message}</Text>
+              )}
+
+              {openPicker === "start" && (
+                <DateTimePicker
+                  value={startDate}
+                  mode="date"
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  onValueChange={handlePickerChange("startDate")}
                 />
-              </TouchableOpacity>
-            </View>
-            <View style={{ flex: 1 }}>
-              <ThemedText style={styles.fieldLabel}>To</ThemedText>
-              <TouchableOpacity
-                style={styles.dateField}
-                onPress={() => setOpenPicker("end")}
-                accessibilityRole="button"
-                accessibilityLabel={`End date, ${formatDate(endDate)}`}
-              >
-                <ThemedText style={styles.dateText}>
-                  {formatDate(endDate)}
-                </ThemedText>
-                <Ionicons
-                  name="calendar-outline"
-                  size={18}
-                  color={colorTheme.placeholder}
+              )}
+              {openPicker === "end" && (
+                <DateTimePicker
+                  value={endDate}
+                  mode="date"
+                  minimumDate={startDate}
+                  display={Platform.OS === "ios" ? "inline" : "default"}
+                  onValueChange={handlePickerChange("endDate")}
                 />
-              </TouchableOpacity>
-            </View>
-          </View>
-          {errors.endDate && (
-            <Text style={styles.errorText}>{errors.endDate.message}</Text>
-          )}
+              )}
+              {Platform.OS === "ios" && openPicker !== null && (
+                <TouchableOpacity
+                  onPress={() => setOpenPicker(null)}
+                  style={styles.pickerDone}
+                >
+                  <Text style={styles.pickerDoneText}>Done</Text>
+                </TouchableOpacity>
+              )}
 
-          {openPicker === "start" && (
-            <DateTimePicker
-              value={startDate}
-              mode="date"
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={handlePickerChange("startDate")}
-            />
-          )}
-          {openPicker === "end" && (
-            <DateTimePicker
-              value={endDate}
-              mode="date"
-              minimumDate={startDate}
-              display={Platform.OS === "ios" ? "inline" : "default"}
-              onChange={handlePickerChange("endDate")}
-            />
-          )}
-          {Platform.OS === "ios" && openPicker !== null && (
-            <TouchableOpacity
-              onPress={() => setOpenPicker(null)}
-              style={styles.pickerDone}
-            >
-              <Text style={styles.pickerDoneText}>Done</Text>
-            </TouchableOpacity>
-          )}
-
-          <Spacer height={8} />
+              <Spacer height={8} />
             </View>
           )}
 
