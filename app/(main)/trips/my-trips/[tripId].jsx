@@ -7,7 +7,7 @@ import {
   View,
 } from "react-native";
 import { useContext, useEffect, useMemo, useState } from "react";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useNavigation, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 
 import { Colors } from "../../../../constants/Colors";
@@ -43,6 +43,7 @@ const shortDate = (value) =>
 
 export default function TripDetails() {
   const { tripId } = useLocalSearchParams();
+  const tripsNavigation = useNavigation();
   const router = useRouter();
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
@@ -63,6 +64,14 @@ export default function TripDetails() {
   const [draftDestinationIds, setDraftDestinationIds] = useState([]);
 
   const numericTripId = Number(tripId);
+
+  const showTripRoute = () => {
+    tripsNavigation.popToTop();
+    router.navigate({
+      pathname: "/explore",
+      params: { mode: "saved-trip", tripId: String(numericTripId) },
+    });
+  };
 
   const editableStops = useMemo(() => {
     if (!trip) return [];
@@ -300,12 +309,7 @@ export default function TripDetails() {
             styles.routeButton,
             (!trip.stops || trip.stops.length < 2) && styles.buttonDisabled,
           ]}
-          onPress={() =>
-            router.push({
-              pathname: "/explore",
-              params: { mode: "saved-trip", tripId: String(numericTripId) },
-            })
-          }
+          onPress={showTripRoute}
           disabled={!trip.stops || trip.stops.length < 2}
           accessibilityRole="button"
           accessibilityLabel="Show trip route"
