@@ -34,6 +34,7 @@ import * as Location from "expo-location";
 import ThemedView from "../../components/ThemedView";
 import ThemedTextInput from "../../components/ThemedTextInput";
 import CustomPopup from "../../components/CustomPopup.jsx";
+import GovernorateFilterSheet from "../../components/GovernorateFilterSheet.jsx";
 import { ThemeContext } from "../../context/ThemeContext";
 import { useTripDraft } from "../../context/TripDraftContext";
 import { Colors } from "../../constants/Colors";
@@ -202,6 +203,9 @@ export default function Explore() {
   const [selectedUtilityTypes, setSelectedUtilityTypes] = useState(() =>
     UTILITY_TYPES.map((item) => item.value),
   );
+  const [governorates, setGovernorates] = useState([]);
+  const [selectedGovernorates, setSelectedGovernorates] = useState([]);
+  const [showGovernorateSheet, setShowGovernorateSheet] = useState(false);
   const [searchRoute, setSearchRoute] = useState(null);
   const [statusRoute, setStatusRoute] = useState(null);
   const { theme, setTheme } = useContext(ThemeContext);
@@ -266,7 +270,25 @@ export default function Explore() {
     () => createLabelConfig(LAYER_FIELDS.utilities, colorTheme),
     [colorTheme.mapLabelText, colorTheme.mapLabelHalo],
   );
-  
+  const destinationDisplayFilter = useMemo(() => {
+    if (
+      governorates.length === 0 ||
+      selectedGovernorates.length === governorates.length
+    ) {
+      return undefined;
+    }
+    if (selectedGovernorates.length === 0) {
+      return { whereClause: "1 = 0", name: "No governorates selected" };
+    }
+    const values = selectedGovernorates
+      .map((gov) => `'${gov.replace(/'/g, "''")}'`)
+      .join(", ");
+    return {
+      whereClause: `Governorate IN (${values})`,
+      name: "Selected governorates",
+    };
+  }, [selectedGovernorates, governorates]);
+
   const utilityDisplayFilter = useMemo(() => {
     if (selectedUtilityTypes.length === 0) {
       return { whereClause: "1 = 0", name: "No utility types selected" };
@@ -372,6 +394,31 @@ export default function Explore() {
       subscription.remove();
     };
   }, []);
+
+  useEffect(() => {
+    if (isTripRouteMode) return;
+    const t = setTimeout(async () => {
+      if (!destLayerRef.current) return;
+      try {
+        const features = await destLayerRef.current.queryFeatures({
+          whereClause: "1=1",
+          outFields: ["Governorate"],
+          returnGeometry: false,
+        });
+        if (!features || features.length === 0) return;
+        const unique = Array.from(
+          new Set(
+            features.map((f) => f.attributes["Governorate"]).filter(Boolean),
+          ),
+        ).sort();
+        setGovernorates(unique);
+        setSelectedGovernorates(unique);
+      } catch (e) {
+        console.warn("Failed to fetch governorates:", e);
+      }
+    }, 1000);
+    return () => clearTimeout(t);
+  }, [isTripRouteMode]);
 
   const isSearchingRef = useRef(false);
   useEffect(() => {
@@ -1129,6 +1176,7 @@ export default function Explore() {
                   visible={showLandmarks}
                   url={FEATURE_LAYERS.destination}
                   renderer={destinationRenderer}
+                  displayFilter={destinationDisplayFilter}
                   labelsEnabled={true}
                   labels={destinationLabelConfig}
                 />
@@ -1477,96 +1525,147 @@ export default function Explore() {
                   ))}
                 </View>
               ) : (
-                <ScrollView
-                  horizontal
-                  showsHorizontalScrollIndicator={false}
-                  style={styles.filterContainer}
-                  contentContainerStyle={styles.filterContent}
-                >
-                  <TouchableOpacity
-                    style={[
-                      styles.filterPill,
-                      showLandmarks && styles.filterPillActive,
-                      showLandmarks && {
-                        backgroundColor: colorTheme.uiBackground,
-                      },
-                      { borderColor: colorTheme.border, borderWidth: 2 },
-                    ]}
-                    onPress={() => setShowLandmarks(!showLandmarks)}
+                <View style={styles.filterRow}>
+                  <ScrollView
+                    horizontal
+                    showsHorizontalScrollIndicator={false}
+                    style={styles.filterContainer}
+                    contentContainerStyle={styles.filterContent}
                   >
-                    <Text
+                    <TouchableOpacity
                       style={[
-                        styles.filterText,
-                        showLandmarks && { color: "#64748B" },
+                        styles.filterPill,
+                        styles.governorateTrigger,
+                        selectedGovernorates.length !== governorates.length &&
+                          governorates.length > 0 &&
+                          styles.filterPillActive,
+                        selectedGovernorates.length !== governorates.length &&
+                          governorates.length > 0 && {
+                            backgroundColor: colorTheme.uiBackground,
+                          },
+                        { borderColor: colorTheme.border, borderWidth: 2 },
                       ]}
+                      onPress={() => setShowGovernorateSheet(true)}
+                      accessibilityRole="button"
+                      accessibilityLabel="Filter by governorate"
                     >
-                      Landmarks
-                    </Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    style={[
-                      styles.filterPill,
-                      showBranches && styles.filterPillActive,
-                      showBranches && {
-                        backgroundColor: colorTheme.uiBackground,
-                      },
-                      { borderColor: colorTheme.border, borderWidth: 2 },
-                    ]}
-                    onPress={() => setShowBranches(!showBranches)}
-                  >
-                    <Text
+                      <Ionicons
+                        name="funnel-outline"
+                        size={13}
+                        color={colorTheme.text}
+                      />
+                      <Text style={styles.filterText} numberOfLines={1}>
+                        {governorates.length === 0
+                          ? "Governorate"
+                          : selectedGovernorates.length === governorates.length
+                            ? "All Governorates"
+                            : selectedGovernorates.length === 0
+                              ? "No Governorates"
+                              : `Governorate (${selectedGovernorates.length})`}
+                      </Text>
+                      <Ionicons
+                        name="chevron-down"
+                        size={12}
+                        color={colorTheme.text}
+                      />
+                    </TouchableOpacity>
+                    <TouchableOpacity
                       style={[
-                        styles.filterText,
-                        showBranches && { color: "#64748B" },
+                        styles.filterPill,
+                        {
+                          backgroundColor:
+                            theme === "dark" ? "#1E293B" : "#FFFFFF",
+                        },
+                        showLandmarks && styles.filterPillActive,
+                        showLandmarks && {
+                          backgroundColor:
+                            theme === "dark" ? "#FFFFFF" : "#1E293B",
+                        },
+                        { borderColor: colorTheme.border, borderWidth: 2 },
                       ]}
+                      onPress={() => setShowLandmarks(!showLandmarks)}
                     >
-                      Branches
-                    </Text>
-                  </TouchableOpacity>
-                  {UTILITY_TYPES.map((utility) => {
-                    const isActive = selectedUtilityTypes.includes(
-                      utility.value,
-                    );
-                    return (
-                      <TouchableOpacity
-                        key={utility.value}
+                      <Text
                         style={[
-                          styles.filterPill,
-                          styles.utilityPill,
-                          isActive && styles.filterPillActive,
-                          isActive && { backgroundColor: utility.color },
+                          styles.filterText,
+                          showLandmarks && { color: "#64748B" },
                         ]}
-                        onPress={() =>
-                          setSelectedUtilityTypes((current) =>
-                            current.includes(utility.value)
-                              ? current.filter((type) => type !== utility.value)
-                              : [...current, utility.value],
-                          )
-                        }
-                        accessibilityRole="switch"
-                        accessibilityState={{ checked: isActive }}
-                        accessibilityLabel={`Toggle ${utility.label}`}
                       >
-                        <Ionicons
-                          name={utility.icon}
-                          size={14}
-                          color={
-                            isActive ? utility.foregroundColor : utility.color
-                          }
-                        />
-                        <Text
+                        Landmarks
+                      </Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={[
+                        styles.filterPill,
+                        {
+                          backgroundColor:
+                            theme === "dark" ? "#1E293B" : "#FFFFFF",
+                        },
+                        showBranches && styles.filterPillActive,
+                        showBranches && {
+                          backgroundColor:
+                            theme === "dark" ? "#FFFFFF" : "#1E293B",
+                        },
+                        { borderColor: colorTheme.border, borderWidth: 2 },
+                      ]}
+                      onPress={() => setShowBranches(!showBranches)}
+                    >
+                      <Text
+                        style={[
+                          styles.filterText,
+                          showBranches && { color: "#64748B" },
+                        ]}
+                      >
+                        Branches
+                      </Text>
+                    </TouchableOpacity>
+                    {UTILITY_TYPES.map((utility) => {
+                      const isActive = selectedUtilityTypes.includes(
+                        utility.value,
+                      );
+                      return (
+                        <TouchableOpacity
+                          key={utility.value}
                           style={[
-                            styles.filterText,
-                            isActive && { color: utility.foregroundColor },
+                            styles.filterPill,
+                            styles.utilityPill,
+                            isActive && styles.filterPillActive,
+                            isActive && { backgroundColor: utility.color },
                           ]}
-                          numberOfLines={1}
+                          onPress={() =>
+                            setSelectedUtilityTypes((current) =>
+                              current.includes(utility.value)
+                                ? current.filter(
+                                    (type) => type !== utility.value,
+                                  )
+                                : [...current, utility.value],
+                            )
+                          }
+                          accessibilityRole="switch"
+                          accessibilityState={{ checked: isActive }}
+                          accessibilityLabel={`Toggle ${utility.label}`}
                         >
-                          {utility.label}
-                        </Text>
-                      </TouchableOpacity>
-                    );
-                  })}
-                </ScrollView>
+                          <Ionicons
+                            name={utility.icon}
+                            size={14}
+                            color={
+                              isActive ? utility.foregroundColor : utility.color
+                            }
+                          />
+                          <Text
+                            style={[
+                              styles.filterText,
+                              isActive && { color: utility.foregroundColor },
+                            ]}
+                            numberOfLines={1}
+                          >
+                            {utility.label}
+                          </Text>
+                        </TouchableOpacity>
+                      );
+                    })}
+                  </ScrollView>
+                </View>
               )}
             </View>
           </TouchableWithoutFeedback>
@@ -1605,6 +1704,14 @@ export default function Explore() {
           </TouchableOpacity>
         )}
       </ThemedView>
+      <GovernorateFilterSheet
+        visible={showGovernorateSheet}
+        onClose={() => setShowGovernorateSheet(false)}
+        governorates={governorates}
+        selectedGovernorates={selectedGovernorates}
+        onChange={setSelectedGovernorates}
+        colorTheme={colorTheme}
+      />
     </>
   );
 }
@@ -1722,8 +1829,17 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     paddingHorizontal: 16,
   },
-  filterContainer: {
+  filterRow: {
+    flexDirection: "row",
+    alignItems: "center",
     marginTop: 10,
+  },
+  governorateTrigger: {
+    flexShrink: 0,
+    marginRight: 8,
+  },
+  filterContainer: {
+    flex: 1,
   },
   filterContent: {
     paddingHorizontal: 4,

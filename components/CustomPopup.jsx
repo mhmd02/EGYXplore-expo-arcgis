@@ -183,9 +183,6 @@ export default function CustomPopup({
                 )}
               </TouchableOpacity>
             )}
-            <TouchableOpacity onPress={() => router.push("/indoor")}>
-              <Text>Indoor</Text>
-            </TouchableOpacity>
           </View>
         </View>
       </View>

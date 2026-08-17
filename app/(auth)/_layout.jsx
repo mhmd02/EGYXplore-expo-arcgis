@@ -24,7 +24,7 @@ export default function AuthLayout() {
         screenOptions={{
           headerShown: true,
           headerBackVisible: false,
-          headerTitleAlign: "center",
+          headerTitleAlign: "left",
           headerStyle: {
             backgroundColor: colorTheme.navBackground,
           },
