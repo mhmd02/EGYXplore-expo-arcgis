@@ -4,10 +4,18 @@ import {
   Text,
   TouchableOpacity,
   Dimensions,
-  ActivityIndicator,
+  Alert,
 } from "react-native";
 import { useState, useRef, useEffect, useContext, useMemo } from "react";
-import { MapSettings, Map, MapView, FeatureLayer } from "expo-arcgis";
+import {
+  MapSettings,
+  Map,
+  MapView,
+  FeatureLayer,
+  GraphicsOverlay,
+  Graphic,
+  geometryEngine,
+} from "expo-arcgis";
 import CompactPicker from "../../../components/CompactPicker";
 import {
   ARCGIS_API_KEY,
@@ -19,109 +27,261 @@ import ThemedView from "../../../components/ThemedView";
 import { Colors } from "../../../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 
-// Centered precisely on your project area in Alexandria
 const DEFAULT_VIEWPOINT = {
   latitude: 31.199231060060278,
   longitude: 29.90664341137817,
-  scale: 2500, // Zoomed in close enough to see indoor features clearly
+  scale: 2500,
 };
 
 export default function Indoor() {
-  const polygonsRenderer = {
-    type: "simple",
-    symbol: {
-      type: "simple-fill",
-      color: "#ff000055",
-      outline: { color: "#16f971", width: 1 },
-    },
-  };
-
-  const networkRenderer = {
-    type: "simple",
-    symbol: {
-      type: "simple-line",
-      color: "#FF00FF", // Bright Magenta / Neon Pink
-      width: 6, // Extra thick for testing
-    },
-  };
-
-  const [mapStatus, setMapStatus] = useState("loading");
-  const [mapError, setMapError] = useState(null);
-  const [fromPlace, setFromPlace] = useState([]);
-  const [toPlace, setToPlace] = useState([]);
-  const [selectedFrom, setSelectedFrom] = useState("");
-  const [selectedTo, setSelectedTo] = useState("");
-
-  const nameLayerRef = useRef(null);
-  const layerRef = useRef(null);
-  const networkRef = useRef(null);
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const screenWidth = Dimensions.get("screen").width;
-
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
+  const mapViewRef = useRef(null);
+  const [mapViewpoint, setMapViewpoint] = useState(DEFAULT_VIEWPOINT);
+  const unitsLayerRef = useRef(null);
+  const nameLayerRef = useRef(null);
+  const [isRouteActive, setIsRouteActive] = useState(false);
+  const [placesList, setPlacesList] = useState([]);
+  const [selectedFrom, setSelectedFrom] = useState("");
+  const [selectedTo, setSelectedTo] = useState("");
+  const [routeGeometry, setRouteGeometry] = useState(null);
+  const [isRouting, setIsRouting] = useState(false);
+  const [routeDirections, setRouteDirections] = useState([]);
+
+  const unitsRenderer = {
+    type: "simple",
+    symbol: {
+      type: "simple-fill",
+      color: [255, 0, 0, 0.33],
+      outline: { color: [22, 249, 113, 1], width: 1 },
+    },
+  };
+
+  const routeSymbol = {
+    type: "simple-line",
+    width: 5,
+    color: "#00f2ff59",
+  };
 
   const fetchFeatures = async () => {
-    if (!nameLayerRef.current) return;
+    if (!nameLayerRef.current) {
+      console.warn("⚠️ nameLayerRef.current is not ready yet.");
+      return;
+    }
     try {
       const features = await nameLayerRef.current.queryFeatures({
         whereClause: "1=1",
-        outFields: ["NAME_LONG"],
+        outFields: ["UNIT_ID", "NAME_LONG", "LEVEL_ID"],
         returnGeometry: false,
       });
 
-      if (!features || features.length === 0) return;
-      const longNames = features
-        .map((f) => f.attributes["NAME_LONG"])
-        .filter(Boolean);
+      if (features && features.length > 0) {
+        const list = [];
 
-      setFromPlace(longNames);
-      setToPlace(longNames);
+        features.forEach((f, index) => {
+          const attrs = f.attributes || f;
+          const unitId =
+            attrs["UNIT_ID"] || attrs["unit_id"] || attrs["Unit_ID"];
+          const name =
+            attrs["NAME_LONG"] ||
+            attrs["name_long"] ||
+            attrs["Name_Long"] ||
+            `Unnamed Room ${index}`;
+          const level =
+            attrs["LEVEL_ID"] ||
+            attrs["level_id"] ||
+            attrs["Level_ID"] ||
+            "Unknown Floor";
 
-      if (longNames.length > 0) {
-        setSelectedFrom(longNames[0]);
-        setSelectedTo(longNames[0]);
+          if (unitId !== undefined && unitId !== null) {
+            list.push({ label: `${name} (${level})`, value: unitId });
+          }
+        });
+
+        list.sort((a, b) => a.label.localeCompare(b.label));
+        setPlacesList(list);
+
+        if (list.length > 0) {
+          setSelectedFrom(list[0].value);
+          setSelectedTo(list[0].value);
+        }
       }
     } catch (error) {
-      console.error("Failed to query hidden layer features:", error);
+      console.error("❌ Failed to query name layer:", error);
+    }
+  };
+  const zoomToUnits = async () => {
+    if (!unitsLayerRef.current) return;
+    try {
+      const extentResult = await unitsLayerRef.current.queryExtent({
+        whereClause: "1=1",
+      });
+      const extent = extentResult?.extent;
+      if (!extent) return;
+
+      // Project the extent's center to geographic coords, since native SR is 32636
+      const centerPoint = {
+        type: "point",
+        x: (extent.xmin + extent.xmax) / 2,
+        y: (extent.ymin + extent.ymax) / 2,
+        spatialReference: extent.spatialReference,
+      };
+      const projectedCenter = geometryEngine.project(centerPoint, 4326);
+
+      setMapViewpoint({
+        latitude: projectedCenter.y,
+        longitude: projectedCenter.x,
+        scale: 2000, // tune this — smaller = more zoomed in
+      });
+    } catch (error) {
+      console.error("❌ Failed to zoom to units extent:", error);
     }
   };
 
   useEffect(() => {
-    const checkNetworkLayer = async () => {
-      // Wait a couple seconds for the map and layers to initialize
-      setTimeout(async () => {
-        if (networkRef.current) {
-          try {
-            const count = await networkRef.current.queryFeatureCount({
-              whereClause: "1=1",
-            });
-            console.log(
-              `✅ Network Layer Loaded! Total features found: ${count}`,
-            );
-          } catch (err) {
-            console.error("❌ Network Layer failed to load or query:", err);
-          }
-        } else {
-          console.log("⚠️ networkRef is not attached yet.");
-        }
-      }, 3000);
-    };
-
-    checkNetworkLayer();
-  }, []);
-
-  // Only fetch feature names for pickers on load; let viewpoint stay stable
-  useEffect(() => {
     const t = setTimeout(() => {
       fetchFeatures();
-    }, 1000);
+      zoomToUnits();
+    }, 2000);
+    return () => clearTimeout(t);
+  }, []);
+  useEffect(() => {
+    const t = setTimeout(() => fetchFeatures(), 2000);
     return () => clearTimeout(t);
   }, []);
 
-  const handleRoutingAction = () => {
-    console.log(`Routing from: ${selectedFrom} to: ${selectedTo}`);
+  const handleRoutingAction = async () => {
+    if (isRouteActive) {
+      setRouteGeometry(null);
+      setRouteDirections([]);
+      setIsRouteActive(false);
+      return;
+    }
+    const fromUnitId = selectedFrom;
+    const toUnitId = selectedTo;
+
+    if (!fromUnitId || !toUnitId || !unitsLayerRef.current) {
+      Alert.alert("Error", "Layers are not ready yet.");
+      return;
+    }
+
+    if (fromUnitId === toUnitId) {
+      Alert.alert(
+        "Same Location",
+        "Please choose two different rooms to route between.",
+      );
+      return;
+    }
+    setIsRouting(true);
+    setRouteGeometry(null);
+    setRouteDirections([]);
+
+    try {
+      const fromQuery = await unitsLayerRef.current.queryFeatures({
+        whereClause: `UNIT_ID = '${fromUnitId}'`,
+        outFields: ["*"],
+        returnGeometry: true,
+        outSpatialReference: { wkid: 32636 },
+      });
+      const toQuery = await unitsLayerRef.current.queryFeatures({
+        whereClause: `UNIT_ID = '${toUnitId}'`,
+        outFields: ["*"],
+        returnGeometry: true,
+        outSpatialReference: { wkid: 32636 },
+      });
+
+      if (!fromQuery.length || !toQuery.length) {
+        Alert.alert("Error", "Could not locate the selected rooms on the map.");
+        setIsRouting(false);
+        return;
+      }
+
+      const getCoordinates = (geom) => {
+        if (!geom) return { x: null, y: null };
+        if (geom.centroid?.x != null)
+          return { x: geom.centroid.x, y: geom.centroid.y };
+        if (geom.x != null && geom.y != null) return { x: geom.x, y: geom.y };
+        if (geom.parts?.[0]?.length) {
+          const ring = geom.parts[0];
+          const n = ring.length;
+          const sum = ring.reduce(
+            (acc, p) => ({ x: acc.x + p.x, y: acc.y + p.y }),
+            { x: 0, y: 0 },
+          );
+          return { x: sum.x / n, y: sum.y / n };
+        }
+        return { x: null, y: null };
+      };
+
+      const projectedFrom = geometryEngine.project(
+        fromQuery[0].geometry,
+        32636,
+      );
+      const projectedTo = geometryEngine.project(toQuery[0].geometry, 32636);
+
+      const startCoords = getCoordinates(projectedFrom);
+      const endCoords = getCoordinates(projectedTo);
+
+      if (!startCoords.x || !startCoords.y || !endCoords.x || !endCoords.y) {
+        Alert.alert(
+          "Error",
+          "Could not extract valid coordinates from the selected rooms.",
+        );
+        setIsRouting(false);
+        return;
+      }
+
+      const stops = `${startCoords.x},${startCoords.y};${endCoords.x},${endCoords.y}`;
+      const locateSettings = JSON.stringify({
+        default: {
+          tolerance: 50,
+          toleranceUnits: "esriMeters",
+          sources: [{ name: "Transitions" }, { name: "Pathways" }],
+        },
+      });
+
+      const routeUrl =
+        `${FEATURE_LAYERS.Network}/solve?stops=${stops}` +
+        `&returnRoutes=true&inSR=32636&outSR=4326&f=json` +
+        `&locateSettings=${encodeURIComponent(locateSettings)}`;
+
+      const response = await fetch(routeUrl);
+      const data = await response.json();
+      const cleanPaths = (paths) =>
+        paths.map((path) => path.map(([x, y]) => [x, y]));
+
+      if (
+        data.routes &&
+        data.routes.features.length > 0 &&
+        data.routes.features[0].attributes.Total_WalkTime > 0
+      ) {
+        const paths = cleanPaths(data.routes.features[0].geometry.paths);
+        setRouteGeometry(paths);
+
+        const steps = (data.directions?.[0]?.features || [])
+          .map((f) => f.attributes.text)
+          .filter(Boolean);
+        setRouteDirections(steps);
+
+        setIsRouteActive(true);
+      } else {
+        Alert.alert(
+          "No Route Found",
+          "We couldn't find a walkable path between these two locations. They may not be connected in the indoor network.",
+        );
+      }
+    } catch (error) {
+      console.error("Routing Error:", error);
+      Alert.alert(
+        "Routing Error",
+        "Something went wrong while calculating the route.",
+      );
+    } finally {
+      setIsRouting(false);
+    }
   };
 
   return (
@@ -130,79 +290,43 @@ export default function Indoor() {
         <MapSettings
           config={{ apiKey: ARCGIS_API_KEY, license: ARCGIS_LICENSE_KEY }}
         >
-          <Map
-            basemap={basemap}
-            style={{ flex: 1 }}
-            initialViewpoint={DEFAULT_VIEWPOINT}
-          >
+          <Map basemap={basemap} viewpoint={mapViewpoint}>
+            <MapView style={styles.map}>
+              <GraphicsOverlay>
+                {routeGeometry && (
+                  <Graphic
+                    geometry={{
+                      type: "polyline",
+                      paths: routeGeometry,
+                      spatialReference: { wkid: 32636 },
+                    }}
+                    symbol={routeSymbol}
+                  />
+                )}
+              </GraphicsOverlay>
+            </MapView>
             <FeatureLayer
-              ref={layerRef}
+              ref={unitsLayerRef}
               url={`${FEATURE_LAYERS.GeoprocessingPane}/3`}
-              renderer={polygonsRenderer}
-              visible={false}
+              renderer={unitsRenderer}
             />
             <FeatureLayer
               ref={nameLayerRef}
               url={`${FEATURE_LAYERS.GeoprocessingPane}/8`}
               visible={false}
             />
-            <FeatureLayer
-              ref={networkRef}
-              url={`${FEATURE_LAYERS.Network}`}
-              visible={true}
-              renderer={networkRenderer}
-            />
-
-            <MapView
-              style={styles.map}
-              viewpoint={DEFAULT_VIEWPOINT}
-              onMapLoaded={() => {
-                setMapStatus("ready");
-                setMapError(null);
-              }}
-              onMapLoadError={(e) => {
-                setMapStatus("error");
-                setMapError(
-                  e.nativeEvent?.message || "The map could not be loaded.",
-                );
-              }}
-            />
           </Map>
         </MapSettings>
-
-        {mapStatus === "loading" && (
-          <View
-            style={[
-              styles.mapStatusCard,
-              { backgroundColor: colorTheme.uiBackground },
-            ]}
-          >
-            <ActivityIndicator size="small" color={Colors.primary} />
-          </View>
-        )}
-        {mapStatus === "error" && (
-          <View
-            style={[
-              styles.mapStatusCard,
-              { backgroundColor: colorTheme.uiBackground },
-            ]}
-          >
-            <Ionicons name="warning-outline" size={18} color={Colors.warning} />
-            <Text style={[styles.mapStatusText, { color: colorTheme.text }]}>
-              {mapError || "Map data is unavailable."}
-            </Text>
-          </View>
-        )}
       </View>
 
       <ThemedView
         safe={true}
+        pointerEvents="box-none"
         style={[
           styles.popupContainer,
           {
             width: screenWidth - 40,
-            backgroundColor: colorTheme.uiBackground,
-            borderColor: colorTheme.border,
+            backgroundColor: colorTheme.background, // Matches CustomPopup background
           },
         ]}
       >
@@ -214,124 +338,141 @@ export default function Indoor() {
               color="#3B82F6"
             />
           </View>
-          <View
-            style={[
-              styles.pickerWrapper,
-              { backgroundColor: colorTheme.background },
-            ]}
-          >
-            <Text style={[styles.label, { color: colorTheme.text }]}>From</Text>
+          <View style={styles.pickerWrapper}>
             <CompactPicker
               selectedValue={selectedFrom}
-              onValueChange={setSelectedFrom}
-              items={fromPlace}
+              onValueChange={(v) => {
+                setSelectedFrom(v);
+                setIsRouteActive(false);
+                setRouteGeometry(null);
+                setRouteDirections([]);
+              }}
+              items={placesList}
               colorTheme={colorTheme}
-              placeholder="Select starting point"
+              placeholder="Starting point"
             />
           </View>
         </View>
-
-        <View
-          style={[styles.divider, { backgroundColor: colorTheme.border }]}
-        />
 
         <View style={styles.infoRow}>
           <View style={styles.iconBox}>
             <Ionicons name="location-outline" size={15} color="#EF4444" />
           </View>
-          <View
-            style={[
-              styles.pickerWrapper,
-              { backgroundColor: colorTheme.background },
-            ]}
-          >
-            <Text style={[styles.label, { color: colorTheme.text }]}>To</Text>
+          <View style={styles.pickerWrapper}>
             <CompactPicker
               selectedValue={selectedTo}
-              onValueChange={setSelectedTo}
-              items={toPlace}
+              onValueChange={(v) => {
+                setSelectedTo(v);
+                setIsRouteActive(false);
+                setRouteGeometry(null);
+                setRouteDirections([]);
+              }}
+              items={placesList}
               colorTheme={colorTheme}
-              placeholder="Select destination"
+              placeholder="Destination"
             />
           </View>
         </View>
 
-        <View style={[styles.actionRow, { borderTopColor: colorTheme.border }]}>
+        <View style={styles.actionRow}>
           <TouchableOpacity
-            style={[
-              styles.actionBtn,
-              { backgroundColor: `${Colors.primary}1A` },
-            ]}
+            style={[styles.actionBtn, { opacity: isRouting ? 0.6 : 1 }]}
             onPress={handleRoutingAction}
+            disabled={isRouting}
           >
             <Ionicons
-              name="navigate-outline"
+              name={isRouteActive ? "stop-outline" : "navigate-outline"}
               size={15}
-              color={Colors.primary}
+              color={isRouteActive ? "#EF4444" : colorTheme.text} // Matches CustomPopup text color logic
             />
-            <Text style={[styles.actionText, { color: Colors.primary }]}>
-              Go
+            <Text
+              style={[
+                styles.actionText,
+                { color: isRouteActive ? "#EF4444" : colorTheme.text },
+              ]}
+            >
+              {isRouting
+                ? "Calculating..."
+                : isRouteActive
+                  ? "Stop"
+                  : "Navigate"}
             </Text>
           </TouchableOpacity>
         </View>
+
+        {routeDirections.length > 0 && (
+          <View style={styles.directionsBox}>
+            {routeDirections.map((step, i) => (
+              <Text
+                key={i}
+                style={[styles.directionText, { color: colorTheme.text }]}
+              >
+                {i + 1}. {step}
+              </Text>
+            ))}
+          </View>
+        )}
       </ThemedView>
     </View>
   );
 }
 
-const createStyles = (theme) =>
+const createStyles = (colorTheme) =>
   StyleSheet.create({
     mainContainer: { flex: 1 },
     mapContainer: { flex: 1 },
     map: { flex: 1 },
-    mapStatusCard: {
-      position: "absolute",
-      top: 50,
-      alignSelf: "center",
-      padding: 10,
-      borderRadius: 8,
-      flexDirection: "row",
-      alignItems: "center",
-      elevation: 4,
-    },
-    mapStatusText: { marginLeft: 8, fontSize: 14 },
     popupContainer: {
       position: "absolute",
-      bottom: 30,
+      top: 60, // Placed at the top
       alignSelf: "center",
-      borderRadius: 16,
-      borderWidth: 1,
+      borderRadius: 8, // Matches CustomPopup
+      borderWidth: 1, // Matches CustomPopup
+      borderColor: "rgba(150,150,150,0.15)", // Matches CustomPopup
       padding: 16,
-      elevation: 6,
+      elevation: 0, // Matches CustomPopup flat look
+      shadowOpacity: 0,
+      zIndex: 999,
     },
-    infoRow: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
-    iconBox: {
-      width: 24,
+    infoRow: {
+      flexDirection: "row",
       alignItems: "center",
+      marginBottom: 8, // Matches CustomPopup infoRow
+    },
+    iconBox: {
+      width: 20, // Matches CustomPopup iconBox
       justifyContent: "center",
+      alignItems: "center",
       marginRight: 8,
     },
     pickerWrapper: {
       flex: 1,
-      borderRadius: 8,
-      paddingHorizontal: 10,
-      paddingVertical: 6,
     },
-    label: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
-    divider: { height: 1, marginVertical: 8 },
     actionRow: {
       flexDirection: "row",
+      alignItems: "center",
       justifyContent: "flex-end",
-      marginTop: 10,
-      paddingTop: 10,
+      marginTop: 8,
+      paddingTop: 12,
       borderTopWidth: 1,
+      borderTopColor: "rgba(150,150,150,0.1)", // Matches CustomPopup divider
+      gap: 16,
     },
     actionBtn: {
       flexDirection: "row",
       alignItems: "center",
-      paddingVertical: 8,
-      paddingHorizontal: 16,
-      borderRadius: 8,
+      gap: 4, // Matches CustomPopup
     },
-    actionText: { marginLeft: 6, fontWeight: "600", fontSize: 14 },
+    actionText: {
+      fontSize: 13, // Matches CustomPopup
+      fontWeight: "500", // Matches CustomPopup
+    },
+    directionsBox: {
+      marginTop: 4,
+      maxHeight: 120,
+    },
+    directionText: {
+      fontSize: 13,
+      marginVertical: 2,
+    },
   });

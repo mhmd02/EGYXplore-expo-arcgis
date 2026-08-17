@@ -26,6 +26,7 @@ export default function CompactPicker({
 }) {
   const [open, setOpen] = useState(false);
   const styles = createStyles(colorTheme);
+  const selectedLabel = items.find((i) => i.value === selectedValue)?.label;
 
   return (
     <>
@@ -35,7 +36,7 @@ export default function CompactPicker({
         activeOpacity={0.7}
       >
         <Text style={styles.fieldText} numberOfLines={1}>
-          {selectedValue || placeholder}
+          {selectedLabel || placeholder}
         </Text>
         <Ionicons name="chevron-down" size={14} color={colorTheme.text} />
       </TouchableOpacity>
@@ -56,12 +57,12 @@ export default function CompactPicker({
               keyExtractor={(item, index) => `${item}-${index}`}
               ItemSeparatorComponent={() => <View style={styles.separator} />}
               renderItem={({ item }) => {
-                const active = item === selectedValue;
+                const active = item.value === selectedValue;
                 return (
                   <TouchableOpacity
                     style={styles.row}
                     onPress={() => {
-                      onValueChange(item);
+                      onValueChange(item.value);
                       setOpen(false);
                     }}
                   >
@@ -69,7 +70,7 @@ export default function CompactPicker({
                       style={[styles.rowText, active && styles.rowTextActive]}
                       numberOfLines={1}
                     >
-                      {item}
+                      {item.label}
                     </Text>
                     {active && (
                       <Ionicons
