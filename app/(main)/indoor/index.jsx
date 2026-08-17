@@ -3,7 +3,6 @@ import {
   View,
   Text,
   TouchableOpacity,
-  Platform,
   Dimensions,
   ActivityIndicator,
 } from "react-native";
@@ -20,10 +19,11 @@ import ThemedView from "../../../components/ThemedView";
 import { Colors } from "../../../constants/Colors";
 import { Ionicons } from "@expo/vector-icons";
 
+// Centered precisely on your project area in Alexandria
 const DEFAULT_VIEWPOINT = {
   latitude: 31.199231060060278,
   longitude: 29.90664341137817,
-  scale: 100000,
+  scale: 2500, // Zoomed in close enough to see indoor features clearly
 };
 
 export default function Indoor() {
@@ -36,6 +36,15 @@ export default function Indoor() {
     },
   };
 
+  const networkRenderer = {
+    type: "simple",
+    symbol: {
+      type: "simple-line",
+      color: "#FF00FF", // Bright Magenta / Neon Pink
+      width: 6, // Extra thick for testing
+    },
+  };
+
   const [mapStatus, setMapStatus] = useState("loading");
   const [mapError, setMapError] = useState(null);
   const [fromPlace, setFromPlace] = useState([]);
@@ -45,14 +54,13 @@ export default function Indoor() {
 
   const nameLayerRef = useRef(null);
   const layerRef = useRef(null);
+  const networkRef = useRef(null);
   const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const styles = useMemo(() => createStyles(colorTheme), [colorTheme]);
   const screenWidth = Dimensions.get("screen").width;
 
   const basemap = theme === "dark" ? "arcGISDarkGray" : "arcGISLightGray";
-
-  const [mapViewpoint, setMapViewpoint] = useState(DEFAULT_VIEWPOINT);
 
   const fetchFeatures = async () => {
     if (!nameLayerRef.current) return;
@@ -81,24 +89,34 @@ export default function Indoor() {
   };
 
   useEffect(() => {
-    const fitToLayer = async () => {
-      try {
-        const extent = await layerRef.current?.queryExtent({
-          whereClause: "1=1",
-        });
-        if (extent) {
-          setMapViewpoint({
-            latitude: (extent.yMin + extent.yMax) / 2,
-            longitude: (extent.xMin + extent.xMax) / 2,
-            scale: 2000,
-          });
+    const checkNetworkLayer = async () => {
+      // Wait a couple seconds for the map and layers to initialize
+      setTimeout(async () => {
+        if (networkRef.current) {
+          try {
+            const count = await networkRef.current.queryFeatureCount({
+              whereClause: "1=1",
+            });
+            console.log(
+              `✅ Network Layer Loaded! Total features found: ${count}`,
+            );
+          } catch (err) {
+            console.error("❌ Network Layer failed to load or query:", err);
+          }
+        } else {
+          console.log("⚠️ networkRef is not attached yet.");
         }
-        await fetchFeatures();
-      } catch (e) {
-        console.warn("queryExtent failed:", e);
-      }
+      }, 3000);
     };
-    const t = setTimeout(fitToLayer, 1000);
+
+    checkNetworkLayer();
+  }, []);
+
+  // Only fetch feature names for pickers on load; let viewpoint stay stable
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchFeatures();
+    }, 1000);
     return () => clearTimeout(t);
   }, []);
 
@@ -121,15 +139,23 @@ export default function Indoor() {
               ref={layerRef}
               url={`${FEATURE_LAYERS.GeoprocessingPane}/3`}
               renderer={polygonsRenderer}
+              visible={false}
             />
             <FeatureLayer
               ref={nameLayerRef}
               url={`${FEATURE_LAYERS.GeoprocessingPane}/8`}
               visible={false}
             />
+            <FeatureLayer
+              ref={networkRef}
+              url={`${FEATURE_LAYERS.Network}`}
+              visible={true}
+              renderer={networkRenderer}
+            />
+
             <MapView
               style={styles.map}
-              viewpoint={mapViewpoint}
+              viewpoint={DEFAULT_VIEWPOINT}
               onMapLoaded={() => {
                 setMapStatus("ready");
                 setMapError(null);
@@ -253,102 +279,59 @@ export default function Indoor() {
   );
 }
 
-const createStyles = (colorTheme) =>
+const createStyles = (theme) =>
   StyleSheet.create({
-    mainContainer: {
-      flex: 1,
-      overflow: "hidden",
-    },
-    mapContainer: {
-      ...StyleSheet.absoluteFill,
-    },
-    map: {
-      flex: 1,
-    },
+    mainContainer: { flex: 1 },
+    mapContainer: { flex: 1 },
+    map: { flex: 1 },
     mapStatusCard: {
       position: "absolute",
-      top: Platform.OS === "ios" ? 130 : 100,
-      left: 16,
-      right: 16,
-      zIndex: 5,
+      top: 50,
+      alignSelf: "center",
+      padding: 10,
+      borderRadius: 8,
       flexDirection: "row",
       alignItems: "center",
-      justifyContent: "center",
-      gap: 8,
-      paddingHorizontal: 12,
-      paddingVertical: 10,
-      borderRadius: 12,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.12,
-      shadowRadius: 8,
       elevation: 4,
     },
-    mapStatusText: {
-      fontSize: 12,
-      fontWeight: "600",
-      flexShrink: 1,
-    },
+    mapStatusText: { marginLeft: 8, fontSize: 14 },
     popupContainer: {
       position: "absolute",
-      top: Platform.OS === "ios" ? 60 : 40,
+      bottom: 30,
       alignSelf: "center",
-      borderRadius: 12,
+      borderRadius: 16,
       borderWidth: 1,
-      padding: 14,
-      shadowColor: "#000",
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.1,
-      shadowRadius: 8,
-      elevation: 5,
+      padding: 16,
+      elevation: 6,
     },
-    infoRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      marginBottom: 6,
-    },
+    infoRow: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
     iconBox: {
-      width: 20,
-      justifyContent: "center",
+      width: 24,
       alignItems: "center",
+      justifyContent: "center",
       marginRight: 8,
     },
     pickerWrapper: {
       flex: 1,
-      borderRadius: 10,
+      borderRadius: 8,
       paddingHorizontal: 10,
-      paddingTop: 2,
-      justifyContent: "center",
+      paddingVertical: 6,
     },
-    label: {
-      fontSize: 10,
-      fontWeight: "600",
-      textTransform: "uppercase",
-      letterSpacing: 0.5,
-      marginBottom: -6,
-    },
-    divider: {
-      height: 1,
-      marginVertical: 6,
-    },
+    label: { fontSize: 12, fontWeight: "600", marginBottom: 2 },
+    divider: { height: 1, marginVertical: 8 },
     actionRow: {
       flexDirection: "row",
       justifyContent: "flex-end",
-      alignItems: "center",
-      marginTop: 6,
+      marginTop: 10,
       paddingTop: 10,
       borderTopWidth: 1,
     },
     actionBtn: {
       flexDirection: "row",
       alignItems: "center",
-      paddingHorizontal: 16,
       paddingVertical: 8,
-      borderRadius: 20,
-      gap: 6,
+      paddingHorizontal: 16,
+      borderRadius: 8,
     },
-    actionText: {
-      fontSize: 13,
-      fontWeight: "700",
-    },
+    actionText: { marginLeft: 6, fontWeight: "600", fontSize: 14 },
   });
