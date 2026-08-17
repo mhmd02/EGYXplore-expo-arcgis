@@ -183,6 +183,19 @@ export default function CustomPopup({
                 )}
               </TouchableOpacity>
             )}
+            {!isNavigating && (
+              <TouchableOpacity
+                style={styles.actionBtn}
+                onPress={() => router.push("/indoor")}
+              >
+                <Ionicons
+                  name="map-outline"
+                  size={15}
+                  color={colorTheme.text}
+                />
+                <Text style={styles.actionText}>Indoor</Text>
+              </TouchableOpacity>
+            )}
           </View>
         </View>
       </View>

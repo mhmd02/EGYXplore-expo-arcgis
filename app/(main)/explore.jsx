@@ -1085,7 +1085,6 @@ export default function Explore() {
     }
   };
   const handleMapTap = async (event) => {
-    // Any tap dismisses the keyboard (was the "map-tapped" message).
     Keyboard.dismiss();
 
     try {
@@ -1096,7 +1095,6 @@ export default function Explore() {
         tolerance: 12,
         maxResults: 1,
       });
-      // Find the first layer result that has a feature (FEATURE_SELECTED).
       const hit = (results || []).find(
         (r) => r.features && r.features.length > 0,
       );
@@ -1581,7 +1579,10 @@ export default function Explore() {
                           backgroundColor:
                             theme === "dark" ? "#FFFFFF" : "#1E293B",
                         },
-                        { borderColor: colorTheme.border, borderWidth: 2 },
+                        {
+                          borderColor: theme === "dark" ? "#334155" : "#E2E8F0",
+                          borderWidth: 2,
+                        },
                       ]}
                       onPress={() => setShowLandmarks(!showLandmarks)}
                     >
@@ -1606,7 +1607,10 @@ export default function Explore() {
                           backgroundColor:
                             theme === "dark" ? "#FFFFFF" : "#1E293B",
                         },
-                        { borderColor: colorTheme.border, borderWidth: 2 },
+                        {
+                          borderColor: theme === "dark" ? "#334155" : "#E2E8F0",
+                          borderWidth: 2,
+                        },
                       ]}
                       onPress={() => setShowBranches(!showBranches)}
                     >

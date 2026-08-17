@@ -164,6 +164,13 @@ export default function MainLayout() {
           ),
         }}
       />
+      <Tabs.Screen
+        name="indoor"
+        options={{
+          headerShown: false,
+          href: null,
+        }}
+      />
     </Tabs>
   );
 }
