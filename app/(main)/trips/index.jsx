@@ -169,7 +169,7 @@ export default function Trips() {
             title={true}
             style={[styles.header, { transform: [{ translateY: -4 }] }]}
           >
-            Sanctuaries
+            Trips
           </ThemedText>
 
           <View style={styles.iconButtonContainer}>

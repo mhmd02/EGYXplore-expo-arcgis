@@ -92,7 +92,7 @@ export default function MainLayout() {
       <Tabs.Screen
         name="trips"
         options={{
-          title: "Sanctuaries",
+          title: "Trips",
           tabBarIcon: ({ focused, color }) => (
             <View style={styles.iconContainer}>
               <Ionicons
