@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   Dimensions,
   Alert,
+  ScrollView,
 } from "react-native";
 import { useState, useRef, useEffect, useContext, useMemo } from "react";
 import {
@@ -55,8 +56,8 @@ export default function Indoor() {
     type: "simple",
     symbol: {
       type: "simple-fill",
-      color: [255, 0, 0, 0.33],
-      outline: { color: [22, 249, 113, 1], width: 1 },
+      color: "#3a51533f",
+      outline: { width: 1, color: "#383838" },
     },
   };
 
@@ -251,7 +252,7 @@ export default function Indoor() {
       const response = await fetch(routeUrl);
       const data = await response.json();
       const cleanPaths = (paths) =>
-        paths.map((path) => path.map(([x, y]) => [x, y]));
+        paths.map((path) => path.map(([x, y]) => ({ x, y })));
 
       if (
         data.routes &&
@@ -260,7 +261,6 @@ export default function Indoor() {
       ) {
         const paths = cleanPaths(data.routes.features[0].geometry.paths);
         setRouteGeometry(paths);
-
         const steps = (data.directions?.[0]?.features || [])
           .map((f) => f.attributes.text)
           .filter(Boolean);
@@ -283,7 +283,6 @@ export default function Indoor() {
       setIsRouting(false);
     }
   };
-
   return (
     <View style={styles.mainContainer}>
       <View style={styles.mapContainer}>
@@ -297,8 +296,8 @@ export default function Indoor() {
                   <Graphic
                     geometry={{
                       type: "polyline",
-                      paths: routeGeometry,
-                      spatialReference: { wkid: 32636 },
+                      parts: routeGeometry,
+                      spatialReference: 4326,
                     }}
                     symbol={routeSymbol}
                   />
@@ -326,7 +325,7 @@ export default function Indoor() {
           styles.popupContainer,
           {
             width: screenWidth - 40,
-            backgroundColor: colorTheme.background, // Matches CustomPopup background
+            backgroundColor: colorTheme.background,
           },
         ]}
       >
@@ -383,7 +382,7 @@ export default function Indoor() {
             <Ionicons
               name={isRouteActive ? "stop-outline" : "navigate-outline"}
               size={15}
-              color={isRouteActive ? "#EF4444" : colorTheme.text} // Matches CustomPopup text color logic
+              color={isRouteActive ? "#EF4444" : colorTheme.text}
             />
             <Text
               style={[
@@ -401,46 +400,56 @@ export default function Indoor() {
         </View>
 
         {routeDirections.length > 0 && (
-          <View style={styles.directionsBox}>
-            {routeDirections.map((step, i) => (
-              <Text
-                key={i}
-                style={[styles.directionText, { color: colorTheme.text }]}
-              >
-                {i + 1}. {step}
-              </Text>
-            ))}
-          </View>
+          <ScrollView
+            style={{ maxHeight: 120 }}
+            contentContainerStyle={{
+              flexGrow: 1,
+              alignItems: "stretch",
+              paddingHorizontal: 24,
+            }}
+            keyboardShouldPersistTaps="handled"
+          >
+            <View style={styles.directionsBox}>
+              {routeDirections.map((step, i) => (
+                <Text
+                  key={i}
+                  style={[styles.directionText, { color: colorTheme.text }]}
+                >
+                  {i + 1}. {step}
+                </Text>
+              ))}
+            </View>
+          </ScrollView>
         )}
       </ThemedView>
     </View>
   );
 }
 
-const createStyles = (colorTheme) =>
+const createStyles = () =>
   StyleSheet.create({
     mainContainer: { flex: 1 },
     mapContainer: { flex: 1 },
     map: { flex: 1 },
     popupContainer: {
       position: "absolute",
-      top: 60, // Placed at the top
+      top: 60,
       alignSelf: "center",
-      borderRadius: 8, // Matches CustomPopup
-      borderWidth: 1, // Matches CustomPopup
-      borderColor: "rgba(150,150,150,0.15)", // Matches CustomPopup
+      borderRadius: 8,
+      borderWidth: 1,
+      borderColor: "rgba(150,150,150,0.15)",
       padding: 16,
-      elevation: 0, // Matches CustomPopup flat look
+      elevation: 0,
       shadowOpacity: 0,
       zIndex: 999,
     },
     infoRow: {
       flexDirection: "row",
       alignItems: "center",
-      marginBottom: 8, // Matches CustomPopup infoRow
+      marginBottom: 8,
     },
     iconBox: {
-      width: 20, // Matches CustomPopup iconBox
+      width: 20,
       justifyContent: "center",
       alignItems: "center",
       marginRight: 8,
@@ -455,21 +464,20 @@ const createStyles = (colorTheme) =>
       marginTop: 8,
       paddingTop: 12,
       borderTopWidth: 1,
-      borderTopColor: "rgba(150,150,150,0.1)", // Matches CustomPopup divider
+      borderTopColor: "rgba(150,150,150,0.1)",
       gap: 16,
     },
     actionBtn: {
       flexDirection: "row",
       alignItems: "center",
-      gap: 4, // Matches CustomPopup
+      gap: 4,
     },
     actionText: {
-      fontSize: 13, // Matches CustomPopup
-      fontWeight: "500", // Matches CustomPopup
+      fontSize: 13,
+      fontWeight: "500",
     },
     directionsBox: {
       marginTop: 4,
-      maxHeight: 120,
     },
     directionText: {
       fontSize: 13,
