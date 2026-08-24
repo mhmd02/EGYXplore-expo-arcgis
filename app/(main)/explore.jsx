@@ -208,7 +208,7 @@ export default function Explore() {
   const [showGovernorateSheet, setShowGovernorateSheet] = useState(false);
   const [searchRoute, setSearchRoute] = useState(null);
   const [statusRoute, setStatusRoute] = useState(null);
-  const { theme, setTheme } = useContext(ThemeContext);
+  const { theme } = useContext(ThemeContext);
   const colorTheme = Colors[theme] ?? Colors.light;
   const insets = useSafeAreaInsets();
   const router = useRouter();
